@@ -67,31 +67,31 @@
     .chip .emo { font-size:20px; line-height:1; }
     .chip .name { font-size:12px; line-height:1.2; text-align:center; }
     .chip.on { border-color:var(--accent); background:var(--accent-soft); box-shadow:inset 0 0 0 1px var(--accent); }
-    .below { display:flex; align-items:center; justify-content:center; gap:12px; min-height:34px; margin-top:4px; }
-    .dup { color:var(--accent); font-size:13px; transition:opacity .25s; }
-    .dup.faded { opacity:0; }
-    .dup:empty { display:none; }
     .btn { width:100%; padding:14px; border:0; border-radius:12px; background:var(--accent); color:#fff; font-size:17px; margin-top:12px; }
     .btn:disabled { opacity:.5; }
     .link { display:block; width:100%; margin-top:6px; padding:8px; border:0; background:transparent; color:var(--muted); font-size:14px; }
     /* история */
     .day { color:var(--muted); font-size:13px; font-weight:600; margin:24px 4px 10px; }
     .day:first-child { margin-top:0; }
-    .tx { display:flex; align-items:center; gap:8px; padding:14px 8px 14px 16px; margin-bottom:10px; }
+    /* строка истории: карточка сдвигается свайпом влево и открывает кнопку «Удалить» */
+    .row { position:relative; margin-bottom:10px; border-radius:14px; overflow:hidden; }
+    .row .card { margin-bottom:0; }
+    .tx { position:relative; z-index:1; display:flex; align-items:center; gap:8px; padding:14px 16px; touch-action:pan-y; transition:transform .25s ease; will-change:transform; }
+    .swipe-del { position:absolute; top:0; right:0; bottom:0; width:96px; padding-left:8px; border:0; background:var(--danger); color:#fff; font-size:15px; visibility:hidden; }
+    .row.swiping .swipe-del { visibility:visible; }
+    .row.swiping .tx { border-radius:0; }
     .tx-main { flex:1; min-width:0; }
     .tx-sub { color:var(--muted); font-size:13px; margin-top:5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .amount { font-weight:600; }
     .amount.pos { color:var(--ok); }
-    .del { flex:0 0 auto; min-width:38px; height:38px; border:0; border-radius:10px; background:transparent; color:var(--muted); font-size:16px; }
-    .del.armed { background:var(--danger); color:#fff; font-size:14px; padding:0 10px; }
-    .del.busy { background:var(--danger); color:#fff; padding:0 10px; }
-    .tx.busy { opacity:.55; pointer-events:none; }
+    .row.busy { pointer-events:none; }
+    .row.busy .tx { opacity:.55; }
     .mini-spinner { display:inline-block; width:16px; height:16px; border:2px solid rgba(255,255,255,.45); border-top-color:#fff; border-radius:50%; animation:spin .8s linear infinite;
       vertical-align:middle; }
     footer { text-align:center; margin-top:18px; }
     .footer-link { border:0; background:transparent; color:var(--muted); font-size:13px; padding:8px; }
     /* уведомление внизу, поверх содержимого */
-    .toast { position:fixed; left:50%; bottom:calc(18px + env(safe-area-inset-bottom)); transform:translate(-50%, 20px); max-width:calc(100% - 28px); padding:11px 16px; border-radius:12px;
+    .toast { position:fixed; left:50%; top:calc(14px + env(safe-area-inset-top)); transform:translate(-50%, -20px); max-width:calc(100% - 28px); padding:11px 16px; border-radius:12px;
       background:var(--toast); color:var(--toast-text); font-size:14px; box-shadow:0 4px 16px rgba(0,0,0,.2); opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; z-index:20; }
     .toast.show { opacity:1; transform:translate(-50%, 0); }
     .toast.err { background:var(--danger); color:#fff; }
@@ -124,9 +124,6 @@
         </div>
         <div id="catGrid" class="grid"></div>
         <button class="btn" id="saveBtn" onclick="save()">Сохранить</button>
-        <div id="belowRow" class="below hidden">
-          <span id="dupText" class="dup"></span>
-        </div>
       </div>
     </section>
 
@@ -140,9 +137,8 @@
   <div id="toast" class="toast"></div>
 
   <script>
-    // prefill — данные траты, пришедшие из ссылки шортката или из вставленного текста:
-    // { merchant, textKey, dupLabel, dupActive }
-    var state = { categories: [], currencies: [], recent: [], prefill: null, editing: null, savedNew: null, armed: -1, deleting: -1, sign: -1, categoryId: "", todayKey: "" };
+    // prefill — данные траты, пришедшие из ссылки шортката или из вставленного текста: { merchant, textKey }
+    var state = { categories: [], currencies: [], recent: [], prefill: null, editing: null, savedNew: null, deleting: -1, sign: -1, categoryId: "", todayKey: "" };
 
     function el(id) { return document.getElementById(id); }
     function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
@@ -239,7 +235,7 @@
       el("signBtn").textContent = s < 0 ? "−" : "+";
       el("amountField").classList.toggle("pos", s > 0);
     }
-    function toggleSign() { setSign(-state.sign); userChanged(); }
+    function toggleSign() { setSign(-state.sign); }
 
     // ---------- категории ----------
     function splitName(name) {
@@ -256,7 +252,7 @@
       }).join("");
     }
     function pickCategory(id) { state.categoryId = id; renderCategories(); }
-    function userPickCategory(i) { var c = state.categories[i]; if (!c) return; pickCategory(c.categoryId); userChanged(); }
+    function userPickCategory(i) { var c = state.categories[i]; if (!c) return; pickCategory(c.categoryId); }
     function categoryName(id) {
       var c = state.categories.filter(function (x) { return x.categoryId === id; })[0];
       return c ? c.categoryName : "";
@@ -265,19 +261,6 @@
       return state.currencies.map(function (c) {
         return '<option value="' + esc(c) + '"' + (c === selected ? " selected" : "") + ">" + esc(c) + "</option>";
       }).join("");
-    }
-
-    // ---------- строка под кнопкой: «Уже записана …» ----------
-    function updateBelow() {
-      var p = state.prefill;
-      var t = el("dupText");
-      t.textContent = p && p.dupLabel ? "ⓘ Уже записана" + (p.dupLabel !== "?" ? " " + p.dupLabel : "") : "";
-      t.classList.toggle("faded", !!(p && p.dupLabel && !p.dupActive));
-      el("belowRow").classList.toggle("hidden", !(p && p.dupLabel));
-    }
-    // любое изменение данных пользователем гасит пометку «уже записана»
-    function userChanged() {
-      if (state.prefill && state.prefill.dupActive) { state.prefill.dupActive = false; updateBelow(); }
     }
 
     // ---------- форма ----------
@@ -294,7 +277,6 @@
       updateClear();
       pickCategory("");
       state.prefill = null;
-      updateBelow();
     }
     // убрать данные траты из адресной строки, чтобы обновление страницы не подставило их снова
     function clearUrl() {
@@ -306,11 +288,9 @@
     function clearAmount() {
       el("amount").value = "";
       updateClear();
-      userChanged();
       el("amount").focus();
     }
-    el("amount").addEventListener("input", function () { updateClear(); userChanged(); });
-    el("currency").addEventListener("change", userChanged);
+    el("amount").addEventListener("input", updateClear);
 
     // вставка текста банка в поле суммы — разбираем и заполняем форму
     el("amount").addEventListener("paste", function (e) {
@@ -321,8 +301,7 @@
       call("apiParseText", [text], function (r) {
         if (!r.ok) { toast(r.error, true); return; }
         fillForm({ amount: r.amount, currencyId: r.currencyId, categoryId: r.suggestedCategoryId });
-        state.prefill = { merchant: r.merchant || "", textKey: r.textKey || "", dupLabel: r.duplicateOf || "", dupActive: !!r.duplicateOf };
-        updateBelow();
+        state.prefill = { merchant: r.merchant || "", textKey: r.textKey || "" };
       });
     });
 
@@ -351,7 +330,7 @@
       var p = state.prefill || {};
       form.merchant = p.merchant || "";
       form.textKey = p.textKey || "";
-      form.allowDuplicate = !!p.dupLabel; // пометку видели и всё равно сохраняют
+      form.allowDuplicate = true; // повтор — осознанное решение пользователя
       call("apiAddTransaction", [form], function (res) {
         setSaving(false);
         store("currency", form.currencyId);
@@ -371,7 +350,6 @@
       state.editing = { row: r.row, expected: { date: r.date, amount: r.amount, currencyId: r.currencyId } };
       state.prefill = null;
       fillForm({ amount: r.amount, currencyId: r.currencyId, categoryId: r.categoryId });
-      updateBelow();
       el("editDate").textContent = "· " + (r.dateLabel || "");
       el("tabs").classList.add("hidden");
       el("editBar").classList.remove("hidden");
@@ -390,23 +368,71 @@
         state.prefill = s.prefill;
         state.savedNew = null;
       } else resetForm();
-      updateBelow();
       showTab("history");
     }
 
-    // ---------- удаление (в два касания) ----------
-    function deleteClick(e, i) {
-      e.stopPropagation();
-      if (state.deleting > -1) return;
-      if (state.armed !== i) {
-        state.armed = i;
-        renderHistory(state.recent);
-        clearTimeout(deleteClick.t);
-        deleteClick.t = setTimeout(function () { state.armed = -1; renderHistory(state.recent); }, 3000);
-        return;
+    // ---------- удаление: свайп влево открывает кнопку «Удалить» ----------
+    var REVEAL = 88; // на сколько уезжает карточка
+    var swipe = { row: null, startX: 0, startY: 0, base: 0, x: 0, active: false, moved: false, openRow: null, swallow: false };
+    function setX(row, x, animate) {
+      var c = row.querySelector(".tx");
+      c.style.transition = animate ? "" : "none";
+      c.style.transform = x ? "translateX(" + x + "px)" : "";
+      if (x < 0) row.classList.add("swiping");
+      else if (animate) setTimeout(function () { if (!c.style.transform) row.classList.remove("swiping"); }, 250);
+      else row.classList.remove("swiping");
+    }
+    function closeOpenRow() { if (swipe.openRow) { setX(swipe.openRow, 0, true); swipe.openRow = null; } }
+    // касание вне открытой строки только закрывает её
+    document.addEventListener("pointerdown", function (e) {
+      swipe.swallow = false;
+      if (swipe.openRow && !swipe.openRow.contains(e.target)) { closeOpenRow(); swipe.swallow = true; }
+    }, true);
+    var list = el("historyList");
+    list.addEventListener("pointerdown", function (e) {
+      var row = e.target.closest(".row");
+      swipe.moved = false;
+      if (!row || state.deleting > -1 || e.target.closest(".swipe-del")) return;
+      swipe.row = row; swipe.startX = e.clientX; swipe.startY = e.clientY;
+      swipe.base = row === swipe.openRow ? -REVEAL : 0; swipe.x = swipe.base; swipe.active = false;
+    });
+    list.addEventListener("pointermove", function (e) {
+      if (!swipe.row) return;
+      var dx = e.clientX - swipe.startX, dy = e.clientY - swipe.startY;
+      if (!swipe.active) {
+        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+        if (Math.abs(dy) >= Math.abs(dx)) { swipe.row = null; return; } // вертикально — это прокрутка
+        swipe.active = true; swipe.moved = true;
+        if (swipe.openRow && swipe.openRow !== swipe.row) closeOpenRow();
+        try { swipe.row.setPointerCapture(e.pointerId); } catch (x) {}
       }
-      clearTimeout(deleteClick.t);
-      state.armed = -1;
+      var x = Math.min(0, swipe.base + dx);
+      if (x < -REVEAL) x = -REVEAL + (x + REVEAL) / 3; // дальше кнопки — с сопротивлением
+      swipe.x = x;
+      setX(swipe.row, x, false);
+    });
+    function endSwipe() {
+      var row = swipe.row;
+      swipe.row = null;
+      if (!row || !swipe.active) return;
+      var open = swipe.x < -REVEAL / 2;
+      setX(row, open ? -REVEAL : 0, true);
+      swipe.openRow = open ? row : null;
+    }
+    list.addEventListener("pointerup", endSwipe);
+    list.addEventListener("pointercancel", endSwipe);
+    list.addEventListener("click", function (e) {
+      if (swipe.moved || swipe.swallow) { swipe.moved = false; swipe.swallow = false; return; }
+      var row = e.target.closest(".row");
+      if (!row) return;
+      var i = Number(row.getAttribute("data-i"));
+      if (e.target.closest(".swipe-del")) { deleteRow(i); return; }
+      if (swipe.openRow) { closeOpenRow(); return; }
+      startEdit(i);
+    });
+    function deleteRow(i) {
+      if (state.deleting > -1) return;
+      swipe.openRow = null;
       state.deleting = i;
       renderHistory(state.recent);
       var r = state.recent[i];
@@ -435,29 +461,30 @@
       if (p[0] !== t[0]) opts.year = "numeric";
       return d.toLocaleDateString("ru-RU", opts);
     }
-    function renderHistory(list) {
-      state.recent = list || [];
+    function renderHistory(items) {
+      state.recent = items || [];
+      swipe.openRow = null;
       var html = "", lastDay = null;
       state.recent.forEach(function (r, i) {
         if (r.dayKey !== lastDay) { html += '<div class="day">' + esc(dayTitle(r.dayKey)) + '</div>'; lastDay = r.dayKey; }
         var n = Number(r.amount);
         var name = r.categoryName || categoryName(r.categoryId) || "Без категории";
         var busy = state.deleting === i;
-        html += '<div class="card tx' + (busy ? ' busy' : '') + '" onclick="startEdit(' + i + ')">' +
+        html += '<div class="row' + (busy ? ' swiping busy' : '') + '" data-i="' + i + '">' +
+          '<button class="swipe-del" aria-label="Удалить">' + (busy ? '<span class="mini-spinner"></span>' : 'Удалить') + '</button>' +
+          '<div class="card tx"' + (busy ? ' style="transform:translateX(-' + REVEAL + 'px)"' : '') + '>' +
           '<div class="tx-main">' +
             '<div><span class="amount' + (n > 0 ? " pos" : "") + '">' + esc(fmtNum(n)) + " " + esc(r.currencyId) + '</span>' +
             (r.amountEUR !== "" && r.currencyId !== "EUR" ? ' <span class="muted">≈ ' + esc(fmtNum(r.amountEUR)) + ' EUR</span>' : '') + '</div>' +
             '<div class="tx-sub">' + esc(name) + (r.time ? ' · ' + esc(r.time) : '') + '</div>' +
           '</div>' +
-          '<button class="del' + (busy ? ' busy' : state.armed === i ? ' armed' : '') + '" onclick="deleteClick(event, ' + i + ')" aria-label="Удалить">' +
-            (busy ? '<span class="mini-spinner"></span>' : state.armed === i ? 'Удалить?' : '✕') + '</button>' +
-          '</div>';
+          '</div></div>';
       });
       el("historyList").innerHTML = html || '<p class="muted">Пока пусто</p>';
     }
 
     // ---------- параметры ссылки (после "#") ----------
-    // amt — сумма, cur — валюта, shop — магазин, cat — категория, key — отпечаток СМС, dup — «уже записана», tab=history,
+    // amt — сумма, cur — валюта, shop — магазин, cat — категория, key — отпечаток СМС, tab=history,
     // t — ключ доступа, api — адрес сервера: их запоминаем на устройстве и сразу убираем из адресной строки
     function readParams() {
       var q = {};
@@ -488,9 +515,8 @@
       setSign(-1);
       if (q.amt) {
         fillForm({ amount: q.amt, currencyId: q.cur, categoryId: q.cat });
-        state.prefill = { merchant: q.shop || "", textKey: q.key || "", dupLabel: q.dup || "", dupActive: !!q.dup };
+        state.prefill = { merchant: q.shop || "", textKey: q.key || "" };
       }
-      updateBelow();
       renderHistory(data.recent);
       if (q.tab === "history") showTab("history");
       el("loader").classList.add("hidden");
