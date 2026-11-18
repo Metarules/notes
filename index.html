@@ -193,7 +193,8 @@
         .then(function (res) {
           if (res && res.ok) { onOk(res.result); return; }
           if (res && res.auth === false) {
-            store("token", null); // ключ не подошёл — забываем его
+            store("token", null); // ключ не подошёл — забываем его и кэш данных
+            store("init", null);
             noAccess("Нет доступа. Откройте форму через шорткат «Бюджет»");
             return;
           }
@@ -464,6 +465,7 @@
     function renderHistory(items) {
       state.recent = items || [];
       swipe.openRow = null;
+      cacheInit({ recent: state.recent });
       var html = "", lastDay = null;
       state.recent.forEach(function (r, i) {
         if (r.dayKey !== lastDay) { html += '<div class="day">' + esc(dayTitle(r.dayKey)) + '</div>'; lastDay = r.dayKey; }
@@ -502,13 +504,31 @@
       return q;
     }
 
-    // ---------- загрузка: показываем страницу, когда пришли данные ----------
+    // ---------- кэш на устройстве: категории, валюты и последняя история ----------
+    // Страница сразу рисуется из кэша, а свежие данные с сервера приходят фоном.
+    function readCache() {
+      if (!store("token") || !isApiUrl(store("api"))) return null;
+      try { var c = JSON.parse(store("init") || "null"); return c && c.categories && c.currencies ? c : null; } catch (e) { return null; }
+    }
+    function cacheInit(part) {
+      var c = readCache();
+      if (!c && !part.categories) return; // нечего дополнять
+      try { store("init", JSON.stringify(Object.assign(c || {}, part))); } catch (e) {}
+    }
+
+    // ---------- загрузка ----------
     var params = readParams();
+    var booted = false;
+    function applyData(data) {
+      state.categories = data.categories || [];
+      state.currencies = data.currencies || [];
+      state.todayKey = data.todayKey || state.todayKey || "";
+    }
+    // первая отрисовка — из кэша или с сервера
     function start(data) {
       var q = params;
-      state.categories = data.categories;
-      state.currencies = data.currencies;
-      state.todayKey = data.todayKey || "";
+      booted = true;
+      applyData(data);
       var cur = store("currency") || (data.currencies.indexOf("RSD") > -1 ? "RSD" : data.currencies[0]);
       el("currency").innerHTML = currencyOptions(cur);
       renderCategories();
@@ -522,11 +542,29 @@
       el("loader").classList.add("hidden");
       el("app").classList.remove("hidden");
     }
+    // свежие данные после отрисовки из кэша — обновляем, не сбивая то, что пользователь уже выбрал
+    function refresh(data) {
+      var cur = el("currency").value;
+      applyData(data);
+      el("currency").innerHTML = currencyOptions(state.currencies.indexOf(cur) > -1 ? cur : (store("currency") || state.currencies[0]));
+      if (!state.categories.some(function (c) { return c.categoryId === state.categoryId; })) state.categoryId = "";
+      renderCategories();
+      if (!state.editing && state.deleting < 0 && !swipe.openRow && !swipe.row) renderHistory(data.recent);
+    }
     function load() {
-      el("spinner").classList.remove("hidden");
-      el("loaderText").textContent = "";
-      el("retryBtn").classList.add("hidden");
-      call("apiGetInitData", [], start, function (msg) {
+      booted = false;
+      var cached = readCache();
+      if (cached) start(cached);
+      else {
+        el("spinner").classList.remove("hidden");
+        el("loaderText").textContent = "";
+        el("retryBtn").classList.add("hidden");
+      }
+      call("apiGetInitData", [], function (data) {
+        cacheInit({ categories: data.categories, currencies: data.currencies, recent: data.recent, todayKey: data.todayKey });
+        if (booted) refresh(data); else start(data);
+      }, function (msg) {
+        if (booted) return; // уже показали из кэша — ошибку увидят при сохранении
         el("spinner").classList.add("hidden");
         el("loaderText").textContent = msg;
         el("retryBtn").classList.remove("hidden");
