@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+  <!-- данные уходят только на сервер Apps Script; чужие скрипты, картинки и формы запрещены -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self'; connect-src https://script.google.com https://script.googleusercontent.com; form-action 'none'; base-uri 'none'; object-src 'none'">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#f6f7f9" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#111317" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Траты">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="icon" href="icons/icon-192.png">
+  <title>Бюджет</title>
+  <script>
+    (function () {
+      var t = null;
+      try { t = localStorage.getItem("theme"); } catch (e) {}
+      if (t !== "dark" && t !== "light") t = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      document.documentElement.setAttribute("data-theme", t);
+    })();
+  </script>
+  <style>
+    :root { --bg:#f6f7f9; --card:#fff; --field:#fff; --text:#1d1f23; --muted:#8a9099; --accent:#2563eb; --accent-soft:#e8efff; --line:#e5e7eb; --ok:#16a34a; --danger:#dc2626; --toast:#1d1f23;
+      --toast-text:#fff; --shadow:rgba(0,0,0,.06); color-scheme:light; }
+    html[data-theme="dark"] { --bg:#111317; --card:#1b1e24; --field:#23272e; --text:#e8eaed; --muted:#9aa0a6; --accent:#3b82f6; --accent-soft:#1e2a44; --line:#2f343c; --ok:#4ade80;
+      --danger:#f87171; --toast:#e8eaed; --toast-text:#111317; --shadow:rgba(0,0,0,.4); color-scheme:dark; }
+    * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+    html { background:var(--bg); }
+    body { margin:0; font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background:var(--bg); color:var(--text); font-size:16px; }
+    button { font-family:inherit; cursor:pointer; }
+    .wrap { max-width:480px; margin:0 auto; padding:calc(12px + env(safe-area-inset-top)) 14px calc(24px + env(safe-area-inset-bottom)); }
+    .hidden { display:none !important; }
+    .muted { color:var(--muted); font-size:13px; }
+    /* загрузка */
+    .loader { position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; padding:0 24px; text-align:center; background:var(--bg); z-index:10; }
+    .spinner { width:34px; height:34px; border:3px solid var(--line); border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    /* вкладки — сегмент на всю ширину */
+    .tabs { display:flex; background:var(--line); border-radius:12px; padding:3px; margin-bottom:14px; }
+    .tabs button { flex:1; padding:9px; border:0; background:transparent; border-radius:9px; font-size:15px; color:var(--muted); }
+    .tabs button.active { background:var(--card); color:var(--text); box-shadow:0 1px 2px var(--shadow); }
+    /* шапка режима изменения */
+    .editbar { display:flex; align-items:center; gap:6px; margin-bottom:14px; min-height:42px; }
+    .editbar .back { border:0; background:transparent; color:var(--accent); font-size:22px; padding:4px 10px 4px 2px; }
+    .editbar .title { font-size:16px; font-weight:600; }
+    .editbar .date { color:var(--muted); font-weight:400; }
+    .card { background:var(--card); border-radius:14px; padding:14px; margin-bottom:10px; box-shadow:0 1px 2px var(--shadow); }
+    /* поле суммы: знак | сумма | валюта */
+    .amount-field { display:flex; align-items:stretch; border:1px solid var(--line); border-radius:12px; background:var(--field); overflow:hidden; }
+    .amount-field .sign { flex:0 0 52px; border:0; border-right:1px solid var(--line); background:transparent; color:var(--text); font-size:22px; }
+    .amount-field.pos .sign, .amount-field.pos input { color:var(--ok); }
+    .amount-field input { flex:1; min-width:0; border:0; outline:none; background:transparent; color:var(--text); font-size:22px; padding:12px; }
+    .amount-field .clear { flex:0 0 40px; border:0; background:transparent; color:var(--muted); font-size:18px; padding:0; }
+    #clearAmt.hidden { display:block !important; visibility:hidden; }
+    .amount-field select { flex:0 0 86px; border:0; border-left:1px solid var(--line); background:transparent; color:var(--text); font-size:16px; padding:0 10px; -webkit-appearance:none;
+      appearance:none; text-align:center; }
+    /* сетка категорий */
+    .grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; margin-top:12px; }
+    .chip { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; min-height:62px; padding:6px 4px; border:1px solid var(--line); border-radius:12px;
+      background:var(--field); color:var(--text); }
+    .chip .emo { font-size:20px; line-height:1; }
+    .chip .name { font-size:12px; line-height:1.2; text-align:center; }
+    .chip.on { border-color:var(--accent); background:var(--accent-soft); box-shadow:inset 0 0 0 1px var(--accent); }
+    .below { display:flex; align-items:center; justify-content:center; gap:12px; min-height:34px; margin-top:4px; }
+    .dup { color:var(--accent); font-size:13px; transition:opacity .25s; }
+    .dup.faded { opacity:0; }
+    .dup:empty { display:none; }
+    .btn { width:100%; padding:14px; border:0; border-radius:12px; background:var(--accent); color:#fff; font-size:17px; margin-top:12px; }
+    .btn:disabled { opacity:.5; }
+    .link { display:block; width:100%; margin-top:6px; padding:8px; border:0; background:transparent; color:var(--muted); font-size:14px; }
+    /* история */
+    .day { color:var(--muted); font-size:13px; font-weight:600; margin:24px 4px 10px; }
+    .day:first-child { margin-top:0; }
+    .tx { display:flex; align-items:center; gap:8px; padding:14px 8px 14px 16px; margin-bottom:10px; }
+    .tx-main { flex:1; min-width:0; }
+    .tx-sub { color:var(--muted); font-size:13px; margin-top:5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .amount { font-weight:600; }
+    .amount.pos { color:var(--ok); }
+    .del { flex:0 0 auto; min-width:38px; height:38px; border:0; border-radius:10px; background:transparent; color:var(--muted); font-size:16px; }
+    .del.armed { background:var(--danger); color:#fff; font-size:14px; padding:0 10px; }
+    .del.busy { background:var(--danger); color:#fff; padding:0 10px; }
+    .tx.busy { opacity:.55; pointer-events:none; }
+    .mini-spinner { display:inline-block; width:16px; height:16px; border:2px solid rgba(255,255,255,.45); border-top-color:#fff; border-radius:50%; animation:spin .8s linear infinite;
+      vertical-align:middle; }
+    footer { text-align:center; margin-top:18px; }
+    .footer-link { border:0; background:transparent; color:var(--muted); font-size:13px; padding:8px; }
+    /* уведомление внизу, поверх содержимого */
+    .toast { position:fixed; left:50%; bottom:calc(18px + env(safe-area-inset-bottom)); transform:translate(-50%, 20px); max-width:calc(100% - 28px); padding:11px 16px; border-radius:12px;
+      background:var(--toast); color:var(--toast-text); font-size:14px; box-shadow:0 4px 16px rgba(0,0,0,.2); opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; z-index:20; }
+    .toast.show { opacity:1; transform:translate(-50%, 0); }
+    .toast.err { background:var(--danger); color:#fff; }
+  </style>
+</head>
+<body>
+  <div id="loader" class="loader">
+    <div class="spinner" id="spinner"></div>
+    <div id="loaderText" class="muted"></div>
+    <button id="retryBtn" class="link hidden" style="width:auto" onclick="load()">Повторить</button>
+  </div>
+
+  <div id="app" class="wrap hidden">
+    <nav id="tabs" class="tabs">
+      <button id="tab-add" class="active" onclick="showTab('add')">Ввод</button>
+      <button id="tab-history" onclick="showTab('history')">История</button>
+    </nav>
+    <div id="editBar" class="editbar hidden">
+      <button class="back" onclick="cancelEdit()" aria-label="Назад">←</button>
+      <span class="title">Изменение траты <span id="editDate" class="date"></span></span>
+    </div>
+
+    <section id="view-add">
+      <div class="card">
+        <div id="amountField" class="amount-field">
+          <button id="signBtn" class="sign" onclick="toggleSign()" aria-label="Сменить знак">−</button>
+          <input id="amount" inputmode="decimal" placeholder="0" autocomplete="off">
+          <button id="clearAmt" class="clear hidden" onclick="clearAmount()" aria-label="Стереть сумму">✕</button>
+          <select id="currency" aria-label="Валюта"></select>
+        </div>
+        <div id="catGrid" class="grid"></div>
+        <button class="btn" id="saveBtn" onclick="save()">Сохранить</button>
+        <div id="belowRow" class="below hidden">
+          <span id="dupText" class="dup"></span>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-history" class="hidden">
+      <div id="historyList"></div>
+    </section>
+
+    <footer><button id="themeBtn" class="footer-link" onclick="toggleTheme()"></button></footer>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+    // prefill — данные траты, пришедшие из ссылки шортката или из вставленного текста:
+    // { merchant, textKey, dupLabel, dupActive }
+    var state = { categories: [], currencies: [], recent: [], prefill: null, editing: null, savedNew: null, armed: -1, deleting: -1, sign: -1, categoryId: "", todayKey: "" };
+
+    function el(id) { return document.getElementById(id); }
+    function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+    function store(key, value) {
+      try {
+        if (value === undefined) return localStorage.getItem(key);
+        if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, value);
+      } catch (e) { return null; }
+    }
+
+    // ---------- уведомление ----------
+    function toast(text, isError) {
+      var t = el("toast");
+      t.textContent = text;
+      t.className = "toast show" + (isError ? " err" : "");
+      clearTimeout(toast.timer);
+      toast.timer = setTimeout(function () { t.className = "toast" + (isError ? " err" : ""); }, isError ? 5000 : 2500);
+    }
+
+    function setSaving(on) {
+      var b = el("saveBtn");
+      b.disabled = on;
+      b.innerHTML = on ? '<span class="mini-spinner"></span>' : "Сохранить";
+    }
+
+    // ---------- связь с сервером (Apps Script) ----------
+    // Адрес сервера и ключ приходят в ссылке от шортката (после "#") и хранятся только на этом устройстве.
+    var API = {
+      apiGetInitData: function () { return { fn: "init" }; },
+      apiGetRecent: function () { return { fn: "recent" }; },
+      apiParseText: function (text) { return { fn: "parse", text: text }; },
+      apiAddTransaction: function (form) { return { fn: "add", form: form }; },
+      apiUpdateTransaction: function (row, expected, form) { return { fn: "update", row: row, expected: expected, form: form }; },
+      apiDeleteTransaction: function (row, expected) { return { fn: "delete", row: row, expected: expected }; }
+    };
+
+    function isApiUrl(u) { return /^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(String(u || "")); }
+
+    function call(fn, args, onOk, onErr) {
+      function fail(msg) {
+        if (onErr) onErr(msg); else toast(msg, true);
+        setSaving(false);
+      }
+      var api = store("api"), token = store("token");
+      if (!isApiUrl(api) || !token) { noAccess("Откройте форму через шорткат «Бюджет»"); return; }
+      var body = API[fn].apply(null, args || []);
+      body.action = "page";
+      body.token = token;
+      // text/plain — «простой» запрос без предварительной проверки CORS, Apps Script его принимает
+      fetch(api, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(body), redirect: "follow", credentials: "omit", referrerPolicy: "no-referrer" })
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+          if (res && res.ok) { onOk(res.result); return; }
+          if (res && res.auth === false) {
+            store("token", null); // ключ не подошёл — забываем его
+            noAccess("Нет доступа. Откройте форму через шорткат «Бюджет»");
+            return;
+          }
+          fail((res && res.error) || "Ошибка сервера");
+        })
+        .catch(function () { fail("Нет связи с сервером"); });
+    }
+
+    function noAccess(text) {
+      el("app").classList.add("hidden");
+      el("loader").classList.remove("hidden");
+      el("spinner").classList.add("hidden");
+      el("retryBtn").classList.add("hidden");
+      el("loaderText").textContent = text;
+    }
+
+    // ---------- тема ----------
+    function currentTheme() { return document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light"; }
+    function updateThemeBtn() { el("themeBtn").textContent = currentTheme() === "dark" ? "☾ Тёмная тема" : "☀︎ Светлая тема"; }
+    function toggleTheme() {
+      var t = currentTheme() === "dark" ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", t);
+      store("theme", t); // запоминаем на этом устройстве
+      updateThemeBtn();
+    }
+
+    // ---------- вкладки ----------
+    function showTab(name) {
+      if (state.editing && name === "add") return;
+      ["add", "history"].forEach(function (t) {
+        el("view-" + t).classList.toggle("hidden", t !== name);
+        el("tab-" + t).classList.toggle("active", t === name);
+      });
+    }
+
+    // ---------- знак ----------
+    function setSign(s) {
+      state.sign = s;
+      el("signBtn").textContent = s < 0 ? "−" : "+";
+      el("amountField").classList.toggle("pos", s > 0);
+    }
+    function toggleSign() { setSign(-state.sign); userChanged(); }
+
+    // ---------- категории ----------
+    function splitName(name) {
+      var m = String(name || "").match(/^(\S+)\s+(.+)$/);
+      if (m && !/[A-Za-zА-Яа-яЁё0-9]/.test(m[1])) return { emo: m[1], label: m[2] };
+      return { emo: "", label: String(name || "") };
+    }
+    function renderCategories() {
+      el("catGrid").innerHTML = state.categories.map(function (c, i) {
+        var n = splitName(c.categoryName);
+        return '<button class="chip' + (c.categoryId === state.categoryId ? " on" : "") + '" onclick="userPickCategory(' + i + ')">' +
+          (n.emo ? '<span class="emo">' + esc(n.emo) + '</span>' : '') +
+          '<span class="name">' + esc(n.label) + '</span></button>';
+      }).join("");
+    }
+    function pickCategory(id) { state.categoryId = id; renderCategories(); }
+    function userPickCategory(i) { var c = state.categories[i]; if (!c) return; pickCategory(c.categoryId); userChanged(); }
+    function categoryName(id) {
+      var c = state.categories.filter(function (x) { return x.categoryId === id; })[0];
+      return c ? c.categoryName : "";
+    }
+    function currencyOptions(selected) {
+      return state.currencies.map(function (c) {
+        return '<option value="' + esc(c) + '"' + (c === selected ? " selected" : "") + ">" + esc(c) + "</option>";
+      }).join("");
+    }
+
+    // ---------- строка под кнопкой: «Уже записана …» ----------
+    function updateBelow() {
+      var p = state.prefill;
+      var t = el("dupText");
+      t.textContent = p && p.dupLabel ? "ⓘ Уже записана" + (p.dupLabel !== "?" ? " " + p.dupLabel : "") : "";
+      t.classList.toggle("faded", !!(p && p.dupLabel && !p.dupActive));
+      el("belowRow").classList.toggle("hidden", !(p && p.dupLabel));
+    }
+    // любое изменение данных пользователем гасит пометку «уже записана»
+    function userChanged() {
+      if (state.prefill && state.prefill.dupActive) { state.prefill.dupActive = false; updateBelow(); }
+    }
+
+    // ---------- форма ----------
+    function fillForm(d) {
+      setSign(Number(d.amount) > 0 ? 1 : -1);
+      el("amount").value = Math.abs(Number(d.amount)) || "";
+      updateClear();
+      if (state.currencies.indexOf(d.currencyId) > -1) el("currency").value = d.currencyId;
+      pickCategory(d.categoryId || "");
+    }
+    function resetForm() {
+      setSign(-1);
+      el("amount").value = "";
+      updateClear();
+      pickCategory("");
+      state.prefill = null;
+      updateBelow();
+    }
+    // убрать данные траты из адресной строки, чтобы обновление страницы не подставило их снова
+    function clearUrl() {
+      try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {}
+    }
+
+    // крестик в поле суммы: стирает только сумму
+    function updateClear() { el("clearAmt").classList.toggle("hidden", !el("amount").value); }
+    function clearAmount() {
+      el("amount").value = "";
+      updateClear();
+      userChanged();
+      el("amount").focus();
+    }
+    el("amount").addEventListener("input", function () { updateClear(); userChanged(); });
+    el("currency").addEventListener("change", userChanged);
+
+    // вставка текста банка в поле суммы — разбираем и заполняем форму
+    el("amount").addEventListener("paste", function (e) {
+      if (state.editing) return;
+      var text = (e.clipboardData || window.clipboardData).getData("text") || "";
+      if (/^\s*[-+]?[\d\s.,]+\s*$/.test(text)) return; // обычное число — вставляем как есть
+      e.preventDefault();
+      call("apiParseText", [text], function (r) {
+        if (!r.ok) { toast(r.error, true); return; }
+        fillForm({ amount: r.amount, currencyId: r.currencyId, categoryId: r.suggestedCategoryId });
+        state.prefill = { merchant: r.merchant || "", textKey: r.textKey || "", dupLabel: r.duplicateOf || "", dupActive: !!r.duplicateOf };
+        updateBelow();
+      });
+    });
+
+    function readForm() {
+      var raw = el("amount").value.trim().replace(/\s/g, "").replace(",", ".").replace(/^[-+]/, "");
+      var amount = Number(raw);
+      if (!raw || !isFinite(amount) || amount === 0) { toast("Введите сумму", true); el("amount").focus(); return null; }
+      if (!state.categoryId) { toast("Выберите категорию", true); return null; }
+      return { amount: state.sign * Math.abs(amount), currencyId: el("currency").value, categoryId: state.categoryId };
+    }
+
+    function save() {
+      var form = readForm();
+      if (!form) return;
+      setSaving(true);
+      if (state.editing) {
+        var ed = state.editing;
+        call("apiUpdateTransaction", [ed.row, ed.expected, form], function (res) {
+          setSaving(false);
+          toast(res.message);
+          cancelEdit();
+          call("apiGetRecent", [], renderHistory);
+        });
+        return;
+      }
+      var p = state.prefill || {};
+      form.merchant = p.merchant || "";
+      form.textKey = p.textKey || "";
+      form.allowDuplicate = !!p.dupLabel; // пометку видели и всё равно сохраняют
+      call("apiAddTransaction", [form], function (res) {
+        setSaving(false);
+        store("currency", form.currencyId);
+        resetForm();
+        clearUrl();
+        toast(res.message);
+        call("apiGetRecent", [], renderHistory);
+      });
+    }
+
+    // ---------- изменение ----------
+    function startEdit(i) {
+      if (state.deleting > -1) return;
+      var r = state.recent[i];
+      if (!r) return;
+      state.savedNew = { amount: el("amount").value, sign: state.sign, categoryId: state.categoryId, currencyId: el("currency").value, prefill: state.prefill };
+      state.editing = { row: r.row, expected: { date: r.date, amount: r.amount, currencyId: r.currencyId } };
+      state.prefill = null;
+      fillForm({ amount: r.amount, currencyId: r.currencyId, categoryId: r.categoryId });
+      updateBelow();
+      el("editDate").textContent = "· " + (r.dateLabel || "");
+      el("tabs").classList.add("hidden");
+      el("editBar").classList.remove("hidden");
+      el("view-history").classList.add("hidden");
+      el("view-add").classList.remove("hidden");
+      window.scrollTo(0, 0);
+    }
+    function cancelEdit() {
+      state.editing = null;
+      el("editBar").classList.add("hidden");
+      el("tabs").classList.remove("hidden");
+      // возвращаем то, что было на «Вводе» до изменения
+      var s = state.savedNew;
+      if (s) {
+        setSign(s.sign); el("amount").value = s.amount; updateClear(); el("currency").value = s.currencyId; pickCategory(s.categoryId);
+        state.prefill = s.prefill;
+        state.savedNew = null;
+      } else resetForm();
+      updateBelow();
+      showTab("history");
+    }
+
+    // ---------- удаление (в два касания) ----------
+    function deleteClick(e, i) {
+      e.stopPropagation();
+      if (state.deleting > -1) return;
+      if (state.armed !== i) {
+        state.armed = i;
+        renderHistory(state.recent);
+        clearTimeout(deleteClick.t);
+        deleteClick.t = setTimeout(function () { state.armed = -1; renderHistory(state.recent); }, 3000);
+        return;
+      }
+      clearTimeout(deleteClick.t);
+      state.armed = -1;
+      state.deleting = i;
+      renderHistory(state.recent);
+      var r = state.recent[i];
+      call("apiDeleteTransaction", [r.row, { date: r.date, amount: r.amount, currencyId: r.currencyId }], function (res) {
+        toast(res.message);
+        call("apiGetRecent", [], function (list) { state.deleting = -1; renderHistory(list); });
+      }, function (msg) {
+        toast(msg, true);
+        state.deleting = -1;
+        renderHistory(state.recent);
+      });
+    }
+
+    // ---------- история ----------
+    function fmtNum(n) { return isFinite(n) ? Number(n).toLocaleString("ru-RU", { maximumFractionDigits: 2 }) : String(n); }
+    function dayTitle(key) {
+      if (!key) return "Без даты";
+      if (key === state.todayKey) return "Сегодня";
+      var p = key.split("-").map(Number);
+      var d = new Date(p[0], p[1] - 1, p[2]);
+      var t = state.todayKey.split("-").map(Number);
+      var today = new Date(t[0], t[1] - 1, t[2]);
+      var diff = Math.round((today - d) / 86400000);
+      if (diff === 1) return "Вчера";
+      var opts = { day: "numeric", month: "long" };
+      if (p[0] !== t[0]) opts.year = "numeric";
+      return d.toLocaleDateString("ru-RU", opts);
+    }
+    function renderHistory(list) {
+      state.recent = list || [];
+      var html = "", lastDay = null;
+      state.recent.forEach(function (r, i) {
+        if (r.dayKey !== lastDay) { html += '<div class="day">' + esc(dayTitle(r.dayKey)) + '</div>'; lastDay = r.dayKey; }
+        var n = Number(r.amount);
+        var name = r.categoryName || categoryName(r.categoryId) || "Без категории";
+        var busy = state.deleting === i;
+        html += '<div class="card tx' + (busy ? ' busy' : '') + '" onclick="startEdit(' + i + ')">' +
+          '<div class="tx-main">' +
+            '<div><span class="amount' + (n > 0 ? " pos" : "") + '">' + esc(fmtNum(n)) + " " + esc(r.currencyId) + '</span>' +
+            (r.amountEUR !== "" && r.currencyId !== "EUR" ? ' <span class="muted">≈ ' + esc(fmtNum(r.amountEUR)) + ' EUR</span>' : '') + '</div>' +
+            '<div class="tx-sub">' + esc(name) + (r.time ? ' · ' + esc(r.time) : '') + '</div>' +
+          '</div>' +
+          '<button class="del' + (busy ? ' busy' : state.armed === i ? ' armed' : '') + '" onclick="deleteClick(event, ' + i + ')" aria-label="Удалить">' +
+            (busy ? '<span class="mini-spinner"></span>' : state.armed === i ? 'Удалить?' : '✕') + '</button>' +
+          '</div>';
+      });
+      el("historyList").innerHTML = html || '<p class="muted">Пока пусто</p>';
+    }
+
+    // ---------- параметры ссылки (после "#") ----------
+    // amt — сумма, cur — валюта, shop — магазин, cat — категория, key — отпечаток СМС, dup — «уже записана», tab=history,
+    // t — ключ доступа, api — адрес сервера: их запоминаем на устройстве и сразу убираем из адресной строки
+    function readParams() {
+      var q = {};
+      try { new URLSearchParams(location.hash.replace(/^#/, "")).forEach(function (v, k) { q[k] = v; }); } catch (e) {}
+      if (q.t || q.api) {
+        if (q.t) store("token", q.t);
+        if (isApiUrl(q.api)) store("api", q.api);
+        var rest = new URLSearchParams();
+        Object.keys(q).forEach(function (k) { if (k !== "t" && k !== "api") rest.append(k, q[k]); });
+        var hash = rest.toString();
+        try { history.replaceState(null, "", location.pathname + location.search + (hash ? "#" + hash : "")); } catch (e) {}
+        delete q.t;
+        delete q.api;
+      }
+      return q;
+    }
+
+    // ---------- загрузка: показываем страницу, когда пришли данные ----------
+    var params = readParams();
+    function start(data) {
+      var q = params;
+      state.categories = data.categories;
+      state.currencies = data.currencies;
+      state.todayKey = data.todayKey || "";
+      var cur = store("currency") || (data.currencies.indexOf("RSD") > -1 ? "RSD" : data.currencies[0]);
+      el("currency").innerHTML = currencyOptions(cur);
+      renderCategories();
+      setSign(-1);
+      if (q.amt) {
+        fillForm({ amount: q.amt, currencyId: q.cur, categoryId: q.cat });
+        state.prefill = { merchant: q.shop || "", textKey: q.key || "", dupLabel: q.dup || "", dupActive: !!q.dup };
+      }
+      updateBelow();
+      renderHistory(data.recent);
+      if (q.tab === "history") showTab("history");
+      el("loader").classList.add("hidden");
+      el("app").classList.remove("hidden");
+    }
+    function load() {
+      el("spinner").classList.remove("hidden");
+      el("loaderText").textContent = "";
+      el("retryBtn").classList.add("hidden");
+      call("apiGetInitData", [], start, function (msg) {
+        el("spinner").classList.add("hidden");
+        el("loaderText").textContent = msg;
+        el("retryBtn").classList.remove("hidden");
+      });
+    }
+    // шорткат открыл новую ссылку на уже открытой странице — перечитываем её
+    window.addEventListener("hashchange", function () { location.reload(); });
+
+    updateThemeBtn();
+    load();
+  </script>
+</body>
+</html>
