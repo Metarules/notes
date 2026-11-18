@@ -191,7 +191,7 @@
       fetch(api, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(body), redirect: "follow", credentials: "omit", referrerPolicy: "no-referrer" })
         .then(function (r) { return r.json(); })
         .then(function (res) {
-          if (res && res.ok) { onOk(res.result); return; }
+          if (res && res.ok) { onOk(res.result, res); return; }
           if (res && res.auth === false) {
             store("token", null); // ключ не подошёл — забываем его и кэш данных
             store("init", null);
@@ -320,11 +320,11 @@
       setSaving(true);
       if (state.editing) {
         var ed = state.editing;
-        call("apiUpdateTransaction", [ed.row, ed.expected, form], function (res) {
+        call("apiUpdateTransaction", [ed.row, ed.expected, form], function (res, full) {
           setSaving(false);
           toast(res.message);
           cancelEdit();
-          call("apiGetRecent", [], renderHistory);
+          showRecent(full);
         });
         return;
       }
@@ -332,14 +332,19 @@
       form.merchant = p.merchant || "";
       form.textKey = p.textKey || "";
       form.allowDuplicate = true; // повтор — осознанное решение пользователя
-      call("apiAddTransaction", [form], function (res) {
+      call("apiAddTransaction", [form], function (res, full) {
         setSaving(false);
         store("currency", form.currencyId);
         resetForm();
         clearUrl();
         toast(res.message);
-        call("apiGetRecent", [], renderHistory);
+        showRecent(full);
       });
+    }
+    // сервер присылает свежую историю вместе с ответом; если её нет — запрашиваем отдельно
+    function showRecent(full) {
+      if (full && full.recent) renderHistory(full.recent);
+      else call("apiGetRecent", [], renderHistory);
     }
 
     // ---------- изменение ----------
@@ -431,19 +436,26 @@
       if (swipe.openRow) { closeOpenRow(); return; }
       startEdit(i);
     });
+    // карточка исчезает сразу, запрос уходит фоном; при ошибке список возвращается как был
     function deleteRow(i) {
-      if (state.deleting > -1) return;
-      swipe.openRow = null;
-      state.deleting = i;
-      renderHistory(state.recent);
+      if (state.deleting > -1) { toast("Подождите, удаляю предыдущую"); return; }
       var r = state.recent[i];
-      call("apiDeleteTransaction", [r.row, { date: r.date, amount: r.amount, currencyId: r.currencyId }], function (res) {
-        toast(res.message);
-        call("apiGetRecent", [], function (list) { state.deleting = -1; renderHistory(list); });
-      }, function (msg) {
-        toast(msg, true);
+      if (!r) return;
+      var before = state.recent.slice();
+      state.deleting = 1;
+      // строки ниже удаляемой в таблице сдвинутся вверх на одну
+      var rest = before.filter(function (x, k) { return k !== i; }).map(function (x) {
+        return x.row > r.row ? Object.assign({}, x, { row: x.row - 1 }) : x;
+      });
+      renderHistory(rest);
+      call("apiDeleteTransaction", [r.row, { date: r.date, amount: r.amount, currencyId: r.currencyId }], function (res, full) {
         state.deleting = -1;
-        renderHistory(state.recent);
+        toast(res.message);
+        if (full && full.recent && !state.editing && !swipe.openRow && !swipe.row) renderHistory(full.recent);
+      }, function (msg) {
+        state.deleting = -1;
+        toast(msg, true);
+        renderHistory(before);
       });
     }
 
@@ -471,7 +483,7 @@
         if (r.dayKey !== lastDay) { html += '<div class="day">' + esc(dayTitle(r.dayKey)) + '</div>'; lastDay = r.dayKey; }
         var n = Number(r.amount);
         var name = r.categoryName || categoryName(r.categoryId) || "Без категории";
-        var busy = state.deleting === i;
+        var busy = false;
         html += '<div class="row' + (busy ? ' swiping busy' : '') + '" data-i="' + i + '">' +
           '<button class="swipe-del" aria-label="Удалить">' + (busy ? '<span class="mini-spinner"></span>' : 'Удалить') + '</button>' +
           '<div class="card tx"' + (busy ? ' style="transform:translateX(-' + REVEAL + 'px)"' : '') + '>' +
