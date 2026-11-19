@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <!-- данные уходят только на сервер Apps Script; чужие скрипты, картинки и формы запрещены -->
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self'; connect-src https://script.google.com https://script.googleusercontent.com; form-action 'none'; base-uri 'none'; object-src 'none'">
   <meta name="referrer" content="no-referrer">
@@ -138,7 +138,8 @@
 
   <script>
     // prefill — данные траты, пришедшие из ссылки шортката или из вставленного текста: { merchant, textKey }
-    var state = { categories: [], currencies: [], recent: [], prefill: null, editing: null, savedNew: null, deleting: -1, sign: -1, categoryId: "", todayKey: "" };
+    // pendingId — id новой траты, пока она не сохранена: повторная отправка после обрыва связи не создаст дубль
+    var state = { categories: [], currencies: [], recent: [], prefill: null, editing: null, savedNew: null, deleting: -1, sign: -1, categoryId: "", todayKey: "", pendingId: null };
 
     function el(id) { return document.getElementById(id); }
     function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
@@ -177,6 +178,8 @@
 
     function isApiUrl(u) { return /^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(String(u || "")); }
 
+    var TIMEOUT_MS = 30000; // дольше ответа не ждём: на плохой связи иначе индикатор крутится бесконечно
+
     function call(fn, args, onOk, onErr) {
       function fail(msg) {
         if (onErr) onErr(msg); else toast(msg, true);
@@ -187,10 +190,18 @@
       var body = API[fn].apply(null, args || []);
       body.action = "page";
       body.token = token;
+      var ctrl = typeof AbortController === "function" ? new AbortController() : null;
+      var timer = ctrl ? setTimeout(function () { ctrl.abort(); }, TIMEOUT_MS) : null;
       // text/plain — «простой» запрос без предварительной проверки CORS, Apps Script его принимает
-      fetch(api, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(body), redirect: "follow", credentials: "omit", referrerPolicy: "no-referrer" })
-        .then(function (r) { return r.json(); })
+      fetch(api, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(body), redirect: "follow", credentials: "omit", referrerPolicy: "no-referrer", signal: ctrl ? ctrl.signal : undefined })
+        .then(function (r) {
+          // Google при сбое (квота, ошибка скрипта) отвечает HTML-страницей, а не JSON
+          return r.text().then(function (text) {
+            try { return JSON.parse(text); } catch (e) { throw { server: "Сервер ответил ошибкой" + (r.status !== 200 ? " (HTTP " + r.status + ")" : "") + " — попробуйте позже" }; }
+          });
+        })
         .then(function (res) {
+          clearTimeout(timer);
           if (res && res.ok) { onOk(res.result, res); return; }
           if (res && res.auth === false) {
             store("token", null); // ключ не подошёл — забываем его и кэш данных
@@ -200,8 +211,21 @@
           }
           fail((res && res.error) || "Ошибка сервера");
         })
-        .catch(function () { fail("Нет связи с сервером"); });
+        .catch(function (e) {
+          clearTimeout(timer);
+          if (e && e.server) fail(e.server);
+          else if (e && e.name === "AbortError") fail("Сервер не ответил — попробуйте ещё раз");
+          else fail("Нет связи с сервером");
+        });
     }
+
+    // случайный id новой траты
+    function newId() {
+      try { if (window.crypto && crypto.randomUUID) return crypto.randomUUID(); } catch (e) {}
+      return Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 12);
+    }
+    // форму поменяли — это уже другая трата, нужен новый id
+    function formChanged() { state.pendingId = null; }
 
     function noAccess(text) {
       el("app").classList.add("hidden");
@@ -236,7 +260,7 @@
       el("signBtn").textContent = s < 0 ? "−" : "+";
       el("amountField").classList.toggle("pos", s > 0);
     }
-    function toggleSign() { setSign(-state.sign); }
+    function toggleSign() { setSign(-state.sign); formChanged(); }
 
     // ---------- категории ----------
     function splitName(name) {
@@ -253,7 +277,7 @@
       }).join("");
     }
     function pickCategory(id) { state.categoryId = id; renderCategories(); }
-    function userPickCategory(i) { var c = state.categories[i]; if (!c) return; pickCategory(c.categoryId); }
+    function userPickCategory(i) { var c = state.categories[i]; if (!c) return; pickCategory(c.categoryId); formChanged(); }
     function categoryName(id) {
       var c = state.categories.filter(function (x) { return x.categoryId === id; })[0];
       return c ? c.categoryName : "";
@@ -266,6 +290,7 @@
 
     // ---------- форма ----------
     function fillForm(d) {
+      formChanged();
       setSign(Number(d.amount) > 0 ? 1 : -1);
       el("amount").value = Math.abs(Number(d.amount)) || "";
       updateClear();
@@ -278,6 +303,7 @@
       updateClear();
       pickCategory("");
       state.prefill = null;
+      formChanged();
     }
     // убрать данные траты из адресной строки, чтобы обновление страницы не подставило их снова
     function clearUrl() {
@@ -289,9 +315,11 @@
     function clearAmount() {
       el("amount").value = "";
       updateClear();
+      formChanged();
       el("amount").focus();
     }
-    el("amount").addEventListener("input", updateClear);
+    el("amount").addEventListener("input", function () { updateClear(); formChanged(); });
+    el("currency").addEventListener("change", formChanged);
 
     // вставка текста банка в поле суммы — разбираем и заполняем форму
     el("amount").addEventListener("paste", function (e) {
@@ -331,7 +359,9 @@
       var p = state.prefill || {};
       form.merchant = p.merchant || "";
       form.textKey = p.textKey || "";
-      form.allowDuplicate = true; // повтор — осознанное решение пользователя
+      // тот же id при повторном нажатии после обрыва связи — сервер не запишет трату второй раз
+      if (!state.pendingId) state.pendingId = newId();
+      form.id = state.pendingId;
       call("apiAddTransaction", [form], function (res, full) {
         setSaving(false);
         store("currency", form.currencyId);
@@ -352,7 +382,7 @@
       if (state.deleting > -1) return;
       var r = state.recent[i];
       if (!r) return;
-      state.savedNew = { amount: el("amount").value, sign: state.sign, categoryId: state.categoryId, currencyId: el("currency").value, prefill: state.prefill };
+      state.savedNew = { amount: el("amount").value, sign: state.sign, categoryId: state.categoryId, currencyId: el("currency").value, prefill: state.prefill, pendingId: state.pendingId };
       state.editing = { row: r.row, expected: { date: r.date, amount: r.amount, currencyId: r.currencyId } };
       state.prefill = null;
       fillForm({ amount: r.amount, currencyId: r.currencyId, categoryId: r.categoryId });
@@ -372,6 +402,7 @@
       if (s) {
         setSign(s.sign); el("amount").value = s.amount; updateClear(); el("currency").value = s.currencyId; pickCategory(s.categoryId);
         state.prefill = s.prefill;
+        state.pendingId = s.pendingId;
         state.savedNew = null;
       } else resetForm();
       showTab("history");
@@ -483,10 +514,9 @@
         if (r.dayKey !== lastDay) { html += '<div class="day">' + esc(dayTitle(r.dayKey)) + '</div>'; lastDay = r.dayKey; }
         var n = Number(r.amount);
         var name = r.categoryName || categoryName(r.categoryId) || "Без категории";
-        var busy = false;
-        html += '<div class="row' + (busy ? ' swiping busy' : '') + '" data-i="' + i + '">' +
-          '<button class="swipe-del" aria-label="Удалить">' + (busy ? '<span class="mini-spinner"></span>' : 'Удалить') + '</button>' +
-          '<div class="card tx"' + (busy ? ' style="transform:translateX(-' + REVEAL + 'px)"' : '') + '>' +
+        html += '<div class="row" data-i="' + i + '">' +
+          '<button class="swipe-del" aria-label="Удалить">Удалить</button>' +
+          '<div class="card tx">' +
           '<div class="tx-main">' +
             '<div><span class="amount' + (n > 0 ? " pos" : "") + '">' + esc(fmtNum(n)) + " " + esc(r.currencyId) + '</span>' +
             (r.amountEUR !== "" && r.currencyId !== "EUR" ? ' <span class="muted">≈ ' + esc(fmtNum(r.amountEUR)) + ' EUR</span>' : '') + '</div>' +
