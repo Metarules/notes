@@ -101,6 +101,10 @@
     .netbar { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; padding:10px 12px; border-radius:12px; background:var(--warn-bg); color:var(--warn); font-size:14px; }
     .netbar button { border:0; background:transparent; color:inherit; font-weight:600; font-size:14px; padding:4px 2px; white-space:nowrap; }
     .netbar button:disabled { opacity:.5; }
+    /* траты из очереди на телефоне — в истории сверху, приглушённо */
+    .row.queued .tx { opacity:.75; }
+    .row.queued .tx-sub .q { color:var(--warn); }
+    .row.queued .tx-sub .q.err { color:var(--danger); }
     .pending { grid-column:1/-1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; min-height:120px; text-align:center; }
     .pending.tall { min-height:160px; }
     .amount-field select.loading { color:var(--muted); }
@@ -115,7 +119,7 @@
 
   <div id="app" class="wrap hidden">
     <div id="netBar" class="netbar hidden" role="status">
-      <span>Нет связи с сервером — сохранить пока не получится</span>
+      <span id="netText">Нет связи с сервером</span>
       <button id="netRetry" onclick="load()">Повторить</button>
     </div>
     <nav id="tabs" class="tabs">
@@ -214,8 +218,8 @@
     var TIMEOUT_MS = 30000; // дольше ответа не ждём: на плохой связи иначе индикатор крутится бесконечно
 
     function call(fn, args, onOk, onErr) {
-      function fail(msg) {
-        if (onErr) onErr(msg); else toast(msg, true);
+      function fail(msg, kind) {
+        if (onErr) onErr(msg, kind || "server"); else toast(msg, true);
         setSaving(false);
       }
       var api = store("api"), token = store("token");
@@ -253,8 +257,8 @@
           clearTimeout(timer);
           if (e && e.server) { setOnline(true); fail(e.server); return; } // ответила страница ошибки Google — связь есть
           setOnline(false);
-          if (e && e.name === "AbortError") fail("Сервер не ответил — попробуйте ещё раз");
-          else fail("Нет связи с сервером");
+          if (e && e.name === "AbortError") fail("Сервер не ответил — попробуйте ещё раз", "network");
+          else fail("Нет связи с сервером", "network");
         });
     }
 
@@ -266,6 +270,7 @@
     // форму поменяли — это уже другая трата, нужен новый id; byUser — изменил сам пользователь
     function formChanged(byUser) {
       state.pendingId = null;
+      state.pendingAt = "";
       if (byUser) state.touched = true;
     }
 
@@ -398,8 +403,74 @@
     function setOnline(on) {
       var changed = state.offline === !!on;
       state.offline = !on;
-      el("netBar").classList.toggle("hidden", !!on);
+      updateNetBar();
       if (changed && !state.loaded) { renderCategories(); renderHistory(null); }
+      if (changed && on) setTimeout(flushOutbox, 0); // связь вернулась — отправляем отложенное
+    }
+    function plural(n, one, few, many) {
+      var m10 = n % 10, m100 = n % 100;
+      return m10 === 1 && m100 !== 11 ? one : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? few : many;
+    }
+    function updateNetBar() {
+      var n = outbox().filter(function (x) { return !x.error; }).length;
+      el("netText").textContent = n
+        ? "Нет связи — на телефоне " + n + " " + plural(n, "трата", "траты", "трат") + ", отправлю, когда появится связь"
+        : "Нет связи с сервером — новые траты сохранятся на телефоне и уйдут позже";
+      el("netBar").classList.toggle("hidden", !state.offline);
+    }
+
+    // ---------- очередь трат на телефоне ----------
+    // Без связи новая трата не теряется: она лежит в localStorage ("outbox") и уходит на сервер,
+    // как только связь появится (при следующем открытии страницы — тоже). У каждой свой id и время
+    // нажатия «Сохранить»: сервер не запишет её дважды и поставит время покупки, а не отправки.
+    // Изменение и удаление уже записанных трат без связи не работают — только новые траты.
+    function outbox(list) {
+      if (list === undefined) { try { var l = JSON.parse(store("outbox") || "[]"); return Array.isArray(l) ? l : []; } catch (e) { return []; } }
+      store("outbox", list.length ? JSON.stringify(list) : null);
+    }
+    function enqueue(form) {
+      var l = outbox();
+      if (!l.some(function (x) { return x.form.id === form.id; })) l.push({ form: form, error: "" });
+      outbox(l);
+      updateNetBar();
+      refreshHistory();
+    }
+    function dropQueued(id) {
+      outbox(outbox().filter(function (x) { return x.form.id !== id; }));
+      updateNetBar();
+      refreshHistory();
+    }
+    // перерисовать историю, если пользователь сейчас с ней не работает
+    function refreshHistory() {
+      if (!state.editing && state.deleting < 0 && !swipe.openRow && !swipe.row) renderHistory(state.loaded ? state.recent : null);
+    }
+    var flushing = false, flushedCount = 0;
+    function flushOutbox() {
+      if (flushing || state.offline) return;
+      var item = outbox().filter(function (x) { return !x.error; })[0];
+      if (!item) {
+        if (flushedCount) { toast("Отправлено с телефона: " + flushedCount + " " + plural(flushedCount, "трата", "траты", "трат")); flushedCount = 0; }
+        return;
+      }
+      flushing = true;
+      call("apiAddTransaction", [item.form], function (res, full) {
+        flushing = false;
+        flushedCount++;
+        outbox(outbox().filter(function (x) { return x.form.id !== item.form.id; }));
+        if (full && full.recent) state.recent = full.recent;
+        updateNetBar();
+        refreshHistory();
+        flushOutbox();
+      }, function (msg, kind) {
+        flushing = false;
+        if (kind === "network") return; // связи нет — подождём
+        // сервер отказал (например, категорию удалили) — повтор не поможет: помечаем, трата видна в истории
+        outbox(outbox().map(function (x) { return x.form.id === item.form.id ? { form: x.form, error: msg } : x; }));
+        toast("Трата с телефона не записалась: " + msg, true);
+        updateNetBar();
+        refreshHistory();
+        flushOutbox();
+      });
     }
     // телефон снова в сети — сразу пробуем загрузить; пропала сеть — сразу показываем плашку
     window.addEventListener("online", function () { load(); });
@@ -523,9 +594,13 @@
       }
       var p = state.prefill || {};
       form.merchant = p.merchant || "";
-      // тот же id при повторном нажатии после обрыва связи — сервер не запишет трату второй раз
-      if (!state.pendingId) state.pendingId = newId();
+      // тот же id при повторном нажатии после обрыва связи — сервер не запишет трату второй раз;
+      // время — момент первого нажатия: так трата из очереди получит время покупки
+      if (!state.pendingId) { state.pendingId = newId(); state.pendingAt = new Date().toISOString(); }
       form.id = state.pendingId;
+      form.at = state.pendingAt;
+      // телефон точно офлайн — сразу в очередь; иначе пробуем отправить (связь могла уже вернуться)
+      if (navigator.onLine === false) { saveToPhone(form); return; }
       call("apiAddTransaction", [form], function (res, full) {
         setSaving(false);
         store("currency", form.currencyId);
@@ -533,7 +608,20 @@
         clearUrl();
         toast(res.message);
         showRecent(full);
+        flushOutbox(); // связь есть — заодно отправим то, что лежало в очереди
+      }, function (msg, kind) {
+        if (kind === "network") { saveToPhone(form); return; }
+        toast(msg, true);
       });
+    }
+    // нет связи — трата в очередь на телефоне, форма очищается как после обычного сохранения
+    function saveToPhone(form) {
+      setSaving(false);
+      enqueue(form);
+      store("currency", form.currencyId);
+      resetForm();
+      clearUrl();
+      toast("Нет связи — трата сохранена на телефоне и уйдёт, когда появится связь", false, 4000);
     }
     // сервер присылает свежую историю вместе с ответом; если её нет — запрашиваем отдельно
     function showRecent(full) {
@@ -546,7 +634,7 @@
       if (state.deleting > -1) return;
       var r = state.recent[i];
       if (!r) return;
-      state.savedNew = { amount: el("amount").value, sign: state.sign, categoryId: state.categoryId, currencyId: el("currency").value, prefill: state.prefill, pendingId: state.pendingId, touched: state.touched };
+      state.savedNew = { amount: el("amount").value, sign: state.sign, categoryId: state.categoryId, currencyId: el("currency").value, prefill: state.prefill, pendingId: state.pendingId, pendingAt: state.pendingAt, touched: state.touched };
       state.editing = { row: r.row, expected: { date: r.date, amount: r.amount, currencyId: r.currencyId } };
       state.prefill = null;
       fillForm({ amount: r.amount, currencyId: r.currencyId, categoryId: r.categoryId });
@@ -567,6 +655,7 @@
         setSign(s.sign); el("amount").value = s.amount; updateClear(); el("currency").value = s.currencyId; pickCategory(s.categoryId);
         state.prefill = s.prefill;
         state.pendingId = s.pendingId;
+        state.pendingAt = s.pendingAt;
         state.touched = s.touched;
         state.savedNew = null;
       } else resetForm();
@@ -627,6 +716,13 @@
       if (swipe.moved || swipe.swallow) { swipe.moved = false; swipe.swallow = false; return; }
       var row = e.target.closest(".row");
       if (!row) return;
+      var qid = row.getAttribute("data-q");
+      if (qid) { // трата из очереди: свайп «Удалить» убирает её с телефона, касание ничего не делает
+        if (e.target.closest(".swipe-del")) dropQueued(qid);
+        else if (swipe.openRow) closeOpenRow();
+        else toast("Эта трата ещё не отправлена — уйдёт, когда появится связь");
+        return;
+      }
       var i = Number(row.getAttribute("data-i"));
       if (e.target.closest(".swipe-del")) { deleteRow(i); return; }
       if (swipe.openRow) { closeOpenRow(); return; }
@@ -670,12 +766,29 @@
       if (p[0] !== t[0]) opts.year = "numeric";
       return d.toLocaleDateString("ru-RU", opts);
     }
+    // траты из очереди на телефоне — отдельным блоком над историей
+    function queuedHtml() {
+      var l = outbox();
+      if (!l.length) return "";
+      return '<div class="day">На телефоне, ещё не отправлено</div>' + l.map(function (x) {
+        var f = x.form, n = Number(f.amount);
+        var t = f.at ? new Date(f.at) : null;
+        var time = t && isFinite(t.getTime()) ? t.toLocaleString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
+        var status = x.error ? '<span class="q err">не записалась: ' + esc(x.error) + '</span>' : '<span class="q">ждёт связи</span>';
+        return '<div class="row queued" data-q="' + esc(f.id) + '">' +
+          '<button class="swipe-del" aria-label="Удалить">Удалить</button>' +
+          '<div class="card tx"><div class="tx-main">' +
+            '<div><span class="amount' + (n > 0 ? " pos" : "") + '">' + esc(fmtNum(n)) + " " + esc(f.currencyId) + '</span></div>' +
+            '<div class="tx-sub">' + esc(categoryName(f.categoryId) || f.categoryId) + (time ? ' · ' + esc(time) : '') + ' · ' + status + '</div>' +
+          '</div></div></div>';
+      }).join("");
+    }
     function renderHistory(items) {
-      if (items === null) { el("historyList").innerHTML = pendingBlock("pending tall"); return; } // ещё грузится
-      state.recent = items || [];
       swipe.openRow = null;
+      if (items === null) { el("historyList").innerHTML = queuedHtml() + pendingBlock("pending tall"); return; } // ещё грузится
+      state.recent = items || [];
       cacheInit({ recent: state.recent });
-      var html = "", lastDay = null;
+      var html = queuedHtml(), lastDay = null;
       state.recent.forEach(function (r, i) {
         if (r.dayKey !== lastDay) { html += '<div class="day">' + esc(dayTitle(r.dayKey)) + '</div>'; lastDay = r.dayKey; }
         var n = Number(r.amount);
@@ -784,6 +897,7 @@
         el("netRetry").disabled = false;
         cacheInit({ categories: data.categories, currencies: data.currencies, merchants: data.merchants || {}, recent: data.recent, todayKey: data.todayKey });
         applyData(data);
+        flushOutbox(); // связь есть — отправляем траты, отложенные без связи
       }, function (msg) {
         el("netRetry").disabled = false;
         if (state.loaded) return; // данные из кэша уже на экране; если нет связи — об этом говорит плашка
