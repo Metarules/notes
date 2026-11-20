@@ -34,7 +34,7 @@
     html { background:var(--bg); }
     body { margin:0; font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background:var(--bg); color:var(--text); font-size:16px; }
     button { font-family:inherit; cursor:pointer; }
-    .wrap { max-width:480px; margin:0 auto; padding:calc(12px + env(safe-area-inset-top)) 14px calc(24px + env(safe-area-inset-bottom)); }
+    .wrap { max-width:480px; margin:0 auto; padding:calc(10px + env(safe-area-inset-top)) 14px calc(96px + env(safe-area-inset-bottom)); } /* снизу запас под плавающую панель браузера */
     .hidden { display:none !important; }
     .muted { color:var(--muted); font-size:13px; }
     /* загрузка */
@@ -42,15 +42,15 @@
     .spinner { width:34px; height:34px; border:3px solid var(--line); border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; }
     @keyframes spin { to { transform:rotate(360deg); } }
     /* вкладки — сегмент на всю ширину */
-    .tabs { display:flex; background:var(--line); border-radius:12px; padding:3px; margin-bottom:14px; }
-    .tabs button { flex:1; padding:9px; border:0; background:transparent; border-radius:9px; font-size:15px; color:var(--muted); }
+    .tabs { display:flex; background:var(--line); border-radius:12px; padding:3px; margin-bottom:10px; }
+    .tabs button { flex:1; padding:8px; border:0; background:transparent; border-radius:9px; font-size:15px; color:var(--muted); }
     .tabs button.active { background:var(--card); color:var(--text); box-shadow:0 1px 2px var(--shadow); }
     /* шапка режима изменения */
     .editbar { display:flex; align-items:center; gap:6px; margin-bottom:14px; min-height:42px; }
     .editbar .back { border:0; background:transparent; color:var(--accent); font-size:22px; padding:4px 10px 4px 2px; }
     .editbar .title { font-size:16px; font-weight:600; }
     .editbar .date { color:var(--muted); font-weight:400; }
-    .card { background:var(--card); border-radius:14px; padding:14px; margin-bottom:10px; box-shadow:0 1px 2px var(--shadow); }
+    .card { background:var(--card); border-radius:14px; padding:12px; margin-bottom:10px; box-shadow:0 1px 2px var(--shadow); }
     /* поле суммы: знак | сумма | валюта */
     .amount-field { display:flex; align-items:stretch; border:1px solid var(--line); border-radius:12px; background:var(--field); overflow:hidden; }
     .amount-field .sign { flex:0 0 52px; border:0; border-right:1px solid var(--line); background:transparent; color:var(--text); font-size:22px; }
@@ -61,15 +61,24 @@
     .amount-field select { flex:0 0 86px; border:0; border-left:1px solid var(--line); background:transparent; color:var(--text); font-size:16px; padding:0 10px; -webkit-appearance:none;
       appearance:none; text-align:center; }
     /* сетка категорий */
-    .grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; margin-top:12px; }
-    .chip { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; min-height:62px; padding:6px 4px; border:1px solid var(--line); border-radius:12px;
+    .grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; margin-top:10px; }
+    .chip { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; min-height:var(--chip-h, 54px); padding:5px 4px; border:1px solid var(--line); border-radius:12px;
       background:var(--field); color:var(--text); }
     .chip .emo { font-size:20px; line-height:1; }
     .chip .name { font-size:12px; line-height:1.2; text-align:center; }
     .chip.on { border-color:var(--accent); background:var(--accent-soft); box-shadow:inset 0 0 0 1px var(--accent); }
-    .btn { width:100%; padding:14px; border:0; border-radius:12px; background:var(--accent); color:#fff; font-size:17px; margin-top:12px; }
+    .btn { width:100%; padding:13px; border:0; border-radius:12px; background:var(--accent); color:#fff; font-size:17px; margin-top:10px; }
     .btn:disabled { opacity:.5; }
     .link { display:block; width:100%; margin-top:6px; padding:8px; border:0; background:transparent; color:var(--muted); font-size:14px; }
+    /* адаптивность: широкий экран (iPad, телефон боком) — шире колонка и 4 категории в ряд;
+       самые узкие (320 точек) — шрифт мельче, чтобы длинные названия не переносились.
+       Высоту кнопок категорий подбирает fitLayout() под высоту экрана. */
+    @media (min-width: 560px) { .wrap { max-width:600px; } .grid { grid-template-columns:repeat(4, 1fr); } }
+    /* компактные кнопки категорий для коротких экранов: эмодзи слева от подписи */
+    .grid.compact .chip { flex-direction:row; gap:5px; padding:4px 6px; }
+    .grid.compact .chip .emo { font-size:16px; }
+    .grid.compact .chip .name { font-size:12px; text-align:left; }
+    @media (max-width: 340px) { .wrap { padding-left:10px; padding-right:10px; } .chip .name { font-size:11px; } .amount-field input { font-size:20px; } }
     /* история */
     .day { color:var(--muted); font-size:13px; font-weight:600; margin:24px 4px 10px; }
     .day:first-child { margin-top:0; }
@@ -393,7 +402,38 @@
         el("view-" + t).classList.toggle("hidden", t !== name);
         el("tab-" + t).classList.toggle("active", t === name);
       });
+      scheduleFit();
     }
+
+    // ---------- подгонка под высоту экрана ----------
+    // Высота кнопок категорий подбирается так, чтобы «Сохранить» помещалась на экране
+    // над плавающей панелью браузера (FIT_RESERVE). Не меньше FIT_MIN — иначе кнопки мелкие
+    // и страницу просто можно прокрутить; не больше FIT_MAX — на больших экранах.
+    // Если места мало даже для FIT_NORMAL_MIN, кнопки становятся компактными (эмодзи слева) — до FIT_COMPACT_MIN.
+    var FIT_RESERVE = 80, FIT_NORMAL_MIN = 48, FIT_COMPACT_MIN = 34, FIT_MAX = 72, fitQueued = false, lastSize = { w: 0, h: 0 };
+    function scheduleFit() {
+      if (fitQueued) return;
+      fitQueued = true;
+      requestAnimationFrame(function () { fitQueued = false; fitLayout(); });
+    }
+    function fitLayout() {
+      var grid = el("catGrid"), chips = grid.querySelectorAll(".chip");
+      if (!chips.length || el("view-add").classList.contains("hidden")) return;
+      var cols = getComputedStyle(grid).gridTemplateColumns.split(" ").length || 3;
+      var rows = Math.ceil(chips.length / cols);
+      var cur = chips[0].getBoundingClientRect().height; // фактическая высота (может быть больше min-height из-за содержимого)
+      var bottom = el("saveBtn").getBoundingClientRect().bottom + window.pageYOffset;
+      var ideal = Math.floor(cur + (window.innerHeight - FIT_RESERVE - bottom) / rows);
+      var compact = ideal < FIT_NORMAL_MIN;
+      grid.classList.toggle("compact", compact);
+      var h = Math.max(compact ? FIT_COMPACT_MIN : FIT_NORMAL_MIN, Math.min(FIT_MAX, ideal));
+      document.documentElement.style.setProperty("--chip-h", h + "px");
+    }
+    // поворот экрана и смена ширины — пересчёт; изменение высоты при прокрутке (панели браузера) — нет
+    window.addEventListener("resize", function () {
+      var w = window.innerWidth, hgt = window.innerHeight;
+      if (w !== lastSize.w || (window.pageYOffset === 0 && Math.abs(hgt - lastSize.h) > 120)) { lastSize = { w: w, h: hgt }; scheduleFit(); }
+    });
 
     // ---------- знак ----------
     function setSign(s) {
@@ -420,7 +460,9 @@
       el("netText").textContent = n
         ? n + " " + plural(n, "операция ждёт", "операции ждут", "операций ждут") + " отправки"
         : "Операции сохранятся на телефоне";
+      var wasHidden = el("netBar").classList.contains("hidden");
       el("netBar").classList.toggle("hidden", !state.offline);
+      if (wasHidden === state.offline) scheduleFit(); // плашка появилась или исчезла — меняется место под кнопки
     }
 
     // ---------- очередь трат на телефоне ----------
@@ -503,6 +545,7 @@
           (n.emo ? '<span class="emo">' + esc(n.emo) + '</span>' : '') +
           '<span class="name">' + esc(n.label) + '</span></button>';
       }).join("");
+      scheduleFit();
     }
     function pickCategory(id) { state.categoryId = id; renderCategories(); }
     function userPickCategory(i) { var c = state.categories[i]; if (!c) return; pickCategory(c.categoryId); formChanged(true); }
@@ -930,6 +973,7 @@
     window.addEventListener("hashchange", function () { location.reload(); });
 
     updateThemeBtn();
+    lastSize = { w: window.innerWidth, h: window.innerHeight };
     boot();
   </script>
 </body>
