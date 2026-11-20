@@ -118,6 +118,10 @@
     .row.queued .tx { opacity:.75; }
     .row.queued .tx-sub .q { color:var(--warn); }
     .row.queued .tx-sub .q.err { color:var(--danger); }
+    .row.queued .tx-sub .q.sending { color:var(--accent); }
+    .row.queued .tx-sub .q.waiting { color:var(--muted); }
+    .row.queued .tx-status { margin-top:3px; white-space:normal; }
+    .q-spin { display:inline-block; width:10px; height:10px; border:1.5px solid currentColor; border-top-color:transparent; border-radius:50%; animation:spin .8s linear infinite; vertical-align:-1px; margin-right:4px; }
     .pending { grid-column:1/-1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; min-height:120px; text-align:center; }
     .pending.tall { min-height:160px; }
     .amount-field select.loading { color:var(--muted); }
@@ -489,6 +493,9 @@
     }
     function dropQueued(id) {
       outbox(outbox().filter(function (x) { return x.form.id !== id; }));
+      // строка была открыта свайпом — сбрасываем его, иначе перерисовка истории пропускается
+      swipe.openRow = null;
+      swipe.row = null;
       updateNetBar();
       refreshHistory();
     }
@@ -496,7 +503,8 @@
     function refreshHistory() {
       if (!state.editing && state.deleting < 0 && !swipe.openRow && !swipe.row) renderHistory(state.loaded ? state.recent : null);
     }
-    var flushing = false, flushedCount = 0;
+    // sendingId — операция из очереди, которая прямо сейчас уходит на сервер (для статуса «отправляется…»)
+    var flushing = false, flushedCount = 0, sendingId = "";
     function flushOutbox() {
       if (flushing || state.offline) return;
       var item = outbox().filter(function (x) { return !x.error; })[0];
@@ -505,8 +513,11 @@
         return;
       }
       flushing = true;
+      sendingId = item.form.id;
+      refreshHistory();
       call("apiAddTransaction", [item.form], function (res, full) {
         flushing = false;
+        sendingId = "";
         flushedCount++;
         outbox(outbox().filter(function (x) { return x.form.id !== item.form.id; }));
         if (full && full.recent) state.recent = full.recent;
@@ -515,7 +526,8 @@
         flushOutbox();
       }, function (msg, kind) {
         flushing = false;
-        if (kind === "network") return; // связи нет — подождём
+        sendingId = "";
+        if (kind === "network") { refreshHistory(); return; } // связи нет — подождём
         // сервер отказал (например, категорию удалили) — повтор не поможет: помечаем, трата видна в истории
         outbox(outbox().map(function (x) { return x.form.id === item.form.id ? { form: x.form, error: msg } : x; }));
         toast("Операция из очереди не записалась: " + msg, true);
@@ -631,9 +643,14 @@
       return { amount: state.sign * Math.abs(amount), currencyId: el("currency").value, categoryId: state.categoryId };
     }
 
+    // изменить или удалить уже записанную операцию можно только со связью (очередь — только для новых)
+    var NO_NET_EDIT = "Нет связи — изменить можно, когда появится связь";
+    var NO_NET_DELETE = "Нет связи — удалить можно, когда появится связь";
+
     function save() {
       var form = readForm();
       if (!form) return;
+      if (state.editing && navigator.onLine === false) { toast(NO_NET_EDIT, false, 3000); return; }
       setSaving(true);
       if (state.editing) {
         var ed = state.editing;
@@ -642,6 +659,8 @@
           toast(res.message);
           cancelEdit();
           showRecent(full);
+        }, function (msg, kind) {
+          if (kind === "network") toast(NO_NET_EDIT, false, 3000); else toast(msg, true);
         });
         return;
       }
@@ -786,6 +805,7 @@
       if (state.deleting > -1) { toast("Подождите, удаляю предыдущую"); return; }
       var r = state.recent[i];
       if (!r) return;
+      if (navigator.onLine === false) { closeOpenRow(); toast(NO_NET_DELETE, false, 3000); return; }
       var before = state.recent.slice();
       state.deleting = 1;
       // строки ниже удаляемой в таблице сдвинутся вверх на одну
@@ -797,9 +817,9 @@
         state.deleting = -1;
         toast(res.message);
         if (full && full.recent && !state.editing && !swipe.openRow && !swipe.row) renderHistory(full.recent);
-      }, function (msg) {
+      }, function (msg, kind) {
         state.deleting = -1;
-        toast(msg, true);
+        if (kind === "network") toast(NO_NET_DELETE, false, 3000); else toast(msg, true);
         renderHistory(before);
       });
     }
@@ -827,12 +847,17 @@
         var f = x.form, n = Number(f.amount);
         var t = f.at ? new Date(f.at) : null;
         var time = t && isFinite(t.getTime()) ? t.toLocaleString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
-        var status = x.error ? '<span class="q err">не записалась: ' + esc(x.error) + '</span>' : '<span class="q">ждёт связи</span>';
+        // статус: не записалась / отправляется сейчас / ждёт своей очереди (связь есть) / ждёт связи
+        var status = x.error ? '<span class="q err">не записалась: ' + esc(x.error) + '</span>'
+          : f.id === sendingId ? '<span class="q sending"><span class="q-spin"></span>отправляется…</span>'
+          : !state.offline ? '<span class="q waiting">в очереди на отправку</span>'
+          : '<span class="q">ждёт связи</span>';
         return '<div class="row queued" data-q="' + esc(f.id) + '">' +
           '<button class="swipe-del" aria-label="Удалить">Удалить</button>' +
           '<div class="card tx"><div class="tx-main">' +
             '<div><span class="amount' + (n > 0 ? " pos" : "") + '">' + esc(fmtNum(n)) + " " + esc(f.currencyId) + '</span></div>' +
-            '<div class="tx-sub">' + esc(categoryName(f.categoryId) || f.categoryId) + (time ? ' · ' + esc(time) : '') + ' · ' + status + '</div>' +
+            '<div class="tx-sub">' + esc(categoryName(f.categoryId) || f.categoryId) + (time ? ' · ' + esc(time) : '') + '</div>' +
+            '<div class="tx-sub tx-status">' + status + '</div>' +
           '</div></div></div>';
       }).join("");
     }
