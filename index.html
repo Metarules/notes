@@ -166,12 +166,13 @@
     }
 
     // ---------- уведомление ----------
-    function toast(text, isError) {
+    // isError — красное уведомление (ошибка); ms — сколько показывать, если нужно дольше обычного
+    function toast(text, isError, ms) {
       var t = el("toast");
       t.textContent = text;
       t.className = "toast show" + (isError ? " err" : "");
       clearTimeout(toast.timer);
-      toast.timer = setTimeout(function () { t.className = "toast" + (isError ? " err" : ""); }, isError ? 5000 : 2500);
+      toast.timer = setTimeout(function () { t.className = "toast" + (isError ? " err" : ""); }, ms || (isError ? 5000 : 2500));
     }
 
     function setSaving(on) {
@@ -448,7 +449,7 @@
       if (/^\s*[-+]?[\d\s.,]+\s*$/.test(text)) return; // обычное число — вставляем как есть
       e.preventDefault();
       var r = parseBankText(text);
-      if (!r) { toast(state.loaded ? "Не нашёл сумму и валюту в тексте" : "Справочники ещё загружаются — попробуйте через пару секунд", true); return; }
+      if (!r) { toast(state.loaded ? "В тексте нет суммы с валютой — введите вручную" : "Справочники ещё загружаются — попробуйте через пару секунд", false, 4000); return; }
       fillForm({ amount: r.amount, currencyId: r.currencyId, categoryId: merchantCategory(r.merchant) });
       state.prefill = { merchant: r.merchant || "" };
       state.touched = true;
@@ -695,7 +696,7 @@
       else if (state.smsText) {
         var r = parseBankText(state.smsText);
         if (r) p = { amount: r.amount, currencyId: r.currencyId, categoryId: merchantCategory(r.merchant), merchant: r.merchant };
-        else if (state.loaded && !state.smsFailShown) { state.smsFailShown = true; toast("Не удалось разобрать СМС — заполните вручную", true); }
+        else if (state.loaded && !state.smsFailShown) { state.smsFailShown = true; toast("В тексте нет суммы с валютой — введите вручную", false, 4000); } // текст мог прийти не из СМС, а из буфера — без красного и без слова «СМС»
       }
       if (!p) return;
       if (state.touched) {
