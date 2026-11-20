@@ -1,6 +1,6 @@
 {
-  "name": "Траты",
-  "short_name": "Траты",
+  "name": "Бюджет",
+  "short_name": "Бюджет",
   "lang": "ru",
   "start_url": "./",
   "scope": "./",

@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="Траты">
+  <meta name="apple-mobile-web-app-title" content="Бюджет">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="icon" href="icons/icon-192.png">
@@ -128,7 +128,7 @@
     </nav>
     <div id="editBar" class="editbar hidden">
       <button class="back" onclick="cancelEdit()" aria-label="Назад">←</button>
-      <span class="title">Изменение траты <span id="editDate" class="date"></span></span>
+      <span class="title">Изменение операции <span id="editDate" class="date"></span></span>
     </div>
 
     <section id="view-add">
@@ -414,8 +414,8 @@
     function updateNetBar() {
       var n = outbox().filter(function (x) { return !x.error; }).length;
       el("netText").textContent = n
-        ? "Нет связи — на телефоне " + n + " " + plural(n, "трата", "траты", "трат") + ", отправлю, когда появится связь"
-        : "Нет связи с сервером — новые траты сохранятся на телефоне и уйдут позже";
+        ? "Нет связи — " + n + " " + plural(n, "операция ждёт", "операции ждут", "операций ждут") + " отправки"
+        : "Нет связи — операции сохранятся на телефоне";
       el("netBar").classList.toggle("hidden", !state.offline);
     }
 
@@ -449,7 +449,7 @@
       if (flushing || state.offline) return;
       var item = outbox().filter(function (x) { return !x.error; })[0];
       if (!item) {
-        if (flushedCount) { toast("Отправлено с телефона: " + flushedCount + " " + plural(flushedCount, "трата", "траты", "трат")); flushedCount = 0; }
+        if (flushedCount) { toast("Отправлено с телефона: " + flushedCount + " " + plural(flushedCount, "операция", "операции", "операций")); flushedCount = 0; }
         return;
       }
       flushing = true;
@@ -466,7 +466,7 @@
         if (kind === "network") return; // связи нет — подождём
         // сервер отказал (например, категорию удалили) — повтор не поможет: помечаем, трата видна в истории
         outbox(outbox().map(function (x) { return x.form.id === item.form.id ? { form: x.form, error: msg } : x; }));
-        toast("Трата с телефона не записалась: " + msg, true);
+        toast("Операция из очереди не записалась: " + msg, true);
         updateNetBar();
         refreshHistory();
         flushOutbox();
@@ -480,7 +480,7 @@
     // пока справочников нет: в сетке категорий — индикатор или ошибка с кнопкой «Повторить»
     function pendingBlock(cls) {
       // нет связи — о ней уже говорит плашка сверху, здесь только тихая пометка
-      if (state.offline) return '<div class="' + cls + '"><span class="muted">Загрузится, когда появится связь</span></div>';
+      if (state.offline) return '<div class="' + cls + '"><span class="muted">Загрузится, когда будет связь</span></div>';
       if (state.loadError) return '<div class="' + cls + '"><span class="muted">' + esc(state.loadError) + '</span><button class="link" style="width:auto;margin:0" onclick="load()">Повторить</button></div>';
       return '<div class="' + cls + '"><span class="spinner sm"></span></div>';
     }
@@ -621,7 +621,7 @@
       store("currency", form.currencyId);
       resetForm();
       clearUrl();
-      toast("Нет связи — трата сохранена на телефоне и уйдёт, когда появится связь", false, 4000);
+      toast("Нет связи — сохранено на телефоне", false, 3000);
     }
     // сервер присылает свежую историю вместе с ответом; если её нет — запрашиваем отдельно
     function showRecent(full) {
@@ -720,7 +720,7 @@
       if (qid) { // трата из очереди: свайп «Удалить» убирает её с телефона, касание ничего не делает
         if (e.target.closest(".swipe-del")) dropQueued(qid);
         else if (swipe.openRow) closeOpenRow();
-        else toast("Эта трата ещё не отправлена — уйдёт, когда появится связь");
+        else toast("Отправится, когда будет связь");
         return;
       }
       var i = Number(row.getAttribute("data-i"));
@@ -770,7 +770,7 @@
     function queuedHtml() {
       var l = outbox();
       if (!l.length) return "";
-      return '<div class="day">На телефоне, ещё не отправлено</div>' + l.map(function (x) {
+      return '<div class="day">Ждут отправки</div>' + l.map(function (x) {
         var f = x.form, n = Number(f.amount);
         var t = f.at ? new Date(f.at) : null;
         var time = t && isFinite(t.getTime()) ? t.toLocaleString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
