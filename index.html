@@ -95,6 +95,11 @@
       background:var(--toast); color:var(--toast-text); font-size:14px; box-shadow:0 4px 16px rgba(0,0,0,.2); opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; z-index:20; }
     .toast.show { opacity:1; transform:translate(-50%, 0); }
     .toast.err { background:var(--danger); color:#fff; }
+    /* пока данные грузятся фоном — индикаторы на месте категорий, валюты и истории */
+    .spinner.sm { width:22px; height:22px; border-width:2px; }
+    .pending { grid-column:1/-1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; min-height:120px; text-align:center; }
+    .pending.tall { min-height:160px; }
+    .amount-field select.loading { color:var(--muted); }
   </style>
 </head>
 <body>
@@ -137,9 +142,12 @@
   <div id="toast" class="toast"></div>
 
   <script>
-    // prefill — данные траты, пришедшие из ссылки шортката или из вставленного текста: { merchant, textKey }
+    // prefill — данные траты из ссылки шортката, СМС или вставленного текста: { merchant }
     // pendingId — id новой траты, пока она не сохранена: повторная отправка после обрыва связи не создаст дубль
-    var state = { categories: [], currencies: [], recent: [], prefill: null, editing: null, savedNew: null, deleting: -1, sign: -1, categoryId: "", todayKey: "", pendingId: null };
+    // loaded — справочники (категории, валюты, магазины) уже есть: из кэша на устройстве или с сервера
+    // touched — пользователь сам менял форму: фоновая загрузка больше не перезаписывает его ввод
+    var state = { categories: [], currencies: [], merchants: {}, recent: [], prefill: null, editing: null, savedNew: null, deleting: -1, sign: -1, categoryId: "", todayKey: "",
+      pendingId: null, loaded: false, loadError: "", touched: false, smsText: "", smsFailShown: false };
 
     function el(id) { return document.getElementById(id); }
     function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
@@ -147,6 +155,13 @@
       try {
         if (value === undefined) return localStorage.getItem(key);
         if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, value);
+      } catch (e) { return null; }
+    }
+    // текст СМС на время жизни вкладки: обновление страницы не теряет подставленную трату
+    function session(key, value) {
+      try {
+        if (value === undefined) return sessionStorage.getItem(key);
+        if (value === null) sessionStorage.removeItem(key); else sessionStorage.setItem(key, value);
       } catch (e) { return null; }
     }
 
@@ -170,13 +185,13 @@
     var API = {
       apiGetInitData: function () { return { fn: "init" }; },
       apiGetRecent: function () { return { fn: "recent" }; },
-      apiParseText: function (text) { return { fn: "parse", text: text }; },
       apiAddTransaction: function (form) { return { fn: "add", form: form }; },
       apiUpdateTransaction: function (row, expected, form) { return { fn: "update", row: row, expected: expected, form: form }; },
       apiDeleteTransaction: function (row, expected) { return { fn: "delete", row: row, expected: expected }; }
     };
 
     function isApiUrl(u) { return /^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(String(u || "")); }
+    function hasAccess() { return isApiUrl(store("api")) && !!store("token"); }
 
     var TIMEOUT_MS = 30000; // дольше ответа не ждём: на плохой связи иначе индикатор крутится бесконечно
 
@@ -224,8 +239,11 @@
       try { if (window.crypto && crypto.randomUUID) return crypto.randomUUID(); } catch (e) {}
       return Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 12);
     }
-    // форму поменяли — это уже другая трата, нужен новый id
-    function formChanged() { state.pendingId = null; }
+    // форму поменяли — это уже другая трата, нужен новый id; byUser — изменил сам пользователь
+    function formChanged(byUser) {
+      state.pendingId = null;
+      if (byUser) state.touched = true;
+    }
 
     function noAccess(text) {
       el("app").classList.add("hidden");
@@ -233,6 +251,89 @@
       el("spinner").classList.add("hidden");
       el("retryBtn").classList.add("hidden");
       el("loaderText").textContent = text;
+    }
+
+    // ---------- разбор СМС / уведомления банка ----------
+    // Те же правила, что и на сервере (parseBankText_ в Code.gs): при изменении — менять в обоих местах.
+
+    // число из строки: "1 234,50", "1.234,50", "1,234.50", "-350" и т.п.
+    function parseNumber(raw) {
+      var s = String(raw).replace(/[\s  ']/g, "");
+      var lastDot = s.lastIndexOf("."), lastComma = s.lastIndexOf(",");
+      if (lastDot > -1 && lastComma > -1) {
+        if (lastComma > lastDot) s = s.replace(/\./g, "").replace(",", ".");
+        else s = s.replace(/,/g, "");
+      } else if (lastComma > -1) {
+        var commas = (s.match(/,/g) || []).length;
+        if (commas > 1 || s.length - lastComma - 1 === 3) s = s.replace(/,/g, "");
+        else s = s.replace(",", ".");
+      } else if (lastDot > -1) {
+        var dots = (s.match(/\./g) || []).length;
+        if (dots > 1 || s.length - lastDot - 1 === 3) s = s.replace(/\./g, "");
+      }
+      return Number(s);
+    }
+
+    function normalizeMerchant(name) {
+      return String(name || "").replace(/\s+/g, " ").trim().replace(/^[=+\-@'\s]+/, "").slice(0, 100).toUpperCase();
+    }
+
+    // категория, которую магазин получил в прошлый раз (только подсказка)
+    function merchantCategory(merchant) {
+      var key = normalizeMerchant(merchant);
+      return key && Object.prototype.hasOwnProperty.call(state.merchants, key) ? String(state.merchants[key]) : "";
+    }
+
+    function extractMerchant(t, amountText) {
+      var patterns = [
+        /(?:trgovac|prodajno mesto|mesto|kod|merchant|магазин|место)\s*[:\-]?\s*([^\n,;]{2,60})/i,
+        /\b(?:at|u|в)\s+([A-ZА-ЯЁ0-9][^\n,;]{1,60})/
+      ];
+      for (var i = 0; i < patterns.length; i++) {
+        var m = t.match(patterns[i]);
+        if (m && m[1] && m[1].indexOf(amountText) === -1) return normalizeMerchant(m[1]);
+      }
+      return "";
+    }
+
+    // { amount, currencyId, merchant } или null. Формат банка разбирается сразу,
+    // общий формат («500 RSD …») — только когда известен список валют.
+    function parseBankText(text) {
+      var t = String(text || "").replace(/ /g, " ");
+
+      // Placeno kart.br. 535174_2257 / MP341 HIPER MC BG / ovi Beograd RS / RSD 2,524.97 / Raspolozivo: RSD 34,718.68
+      var parts = t.split("/").map(function (s) { return s.trim(); }).filter(Boolean);
+      if (/^plac[ae]no\b/i.test(parts[0] || "") && parts.length >= 4) {
+        for (var i = 2; i < parts.length; i++) {
+          if (/^raspolo/i.test(parts[i])) break;
+          var am = parts[i].match(/^([A-Za-z]{3})\s*([\d.,\s]+)$/) || parts[i].match(/^([\d.,\s]+)\s*([A-Za-z]{3})$/);
+          if (!am) continue;
+          var codeFirst = /^[A-Za-z]/.test(am[1]);
+          var value = parseNumber(codeFirst ? am[2] : am[1]);
+          if (isFinite(value) && value !== 0)
+            return { amount: -Math.abs(value), currencyId: (codeFirst ? am[1] : am[2]).toUpperCase(), merchant: normalizeMerchant(parts[1]) };
+        }
+      }
+      var codes = state.currencies.map(function (c) { return String(c).replace(/[^A-Za-z]/g, ""); }).filter(Boolean);
+      if (!codes.length) return null;
+      var codeRe = codes.join("|");
+      var num = "(\\d{1,3}(?:[ .,']\\d{3})+(?:[.,]\\d{1,2})?|\\d+(?:[.,]\\d{1,2})?)";
+
+      var amountStr = "", currencyId = "", matched = "";
+      // перед суммой — начало строки или не цифра (вместо lookbehind, которого нет в старом Safari)
+      var m = t.match(new RegExp("(?:^|[^\\d.,])" + num + "\\s*(" + codeRe + ")\\b", "i"));
+      if (m) { amountStr = m[1]; currencyId = m[2]; matched = m[0]; }
+      else {
+        m = t.match(new RegExp("\\b(" + codeRe + ")\\s*" + num, "i"));
+        if (m) { currencyId = m[1]; amountStr = m[2]; matched = m[0]; }
+      }
+      if (!m) return null;
+
+      var amount = Math.abs(parseNumber(amountStr));
+      if (!isFinite(amount) || amount === 0) return null;
+      // поступления — со знаком плюс, всё остальное — расход
+      if (!/(uplat|priliv|odobren|povra[ćt]|refund|\bcredited\b|зачисл|пополн|возврат|поступ)/i.test(t)) amount = -amount;
+      return { amount: amount, currencyId: currencyId.toUpperCase(), merchant: extractMerchant(t, matched.trim()) };
     }
 
     // ---------- тема ----------
@@ -260,7 +361,14 @@
       el("signBtn").textContent = s < 0 ? "−" : "+";
       el("amountField").classList.toggle("pos", s > 0);
     }
-    function toggleSign() { setSign(-state.sign); formChanged(); }
+    function toggleSign() { setSign(-state.sign); formChanged(true); }
+
+    // ---------- индикаторы загрузки ----------
+    // пока справочников нет: в сетке категорий — индикатор или ошибка с кнопкой «Повторить»
+    function pendingBlock(cls) {
+      if (state.loadError) return '<div class="' + cls + '"><span class="muted">' + esc(state.loadError) + '</span><button class="link" style="width:auto;margin:0" onclick="load()">Повторить</button></div>';
+      return '<div class="' + cls + '"><span class="spinner sm"></span></div>';
+    }
 
     // ---------- категории ----------
     function splitName(name) {
@@ -269,6 +377,7 @@
       return { emo: "", label: String(name || "") };
     }
     function renderCategories() {
+      if (!state.loaded) { el("catGrid").innerHTML = pendingBlock("pending"); return; }
       el("catGrid").innerHTML = state.categories.map(function (c, i) {
         var n = splitName(c.categoryName);
         return '<button class="chip' + (c.categoryId === state.categoryId ? " on" : "") + '" onclick="userPickCategory(' + i + ')">' +
@@ -277,15 +386,21 @@
       }).join("");
     }
     function pickCategory(id) { state.categoryId = id; renderCategories(); }
-    function userPickCategory(i) { var c = state.categories[i]; if (!c) return; pickCategory(c.categoryId); formChanged(); }
+    function userPickCategory(i) { var c = state.categories[i]; if (!c) return; pickCategory(c.categoryId); formChanged(true); }
     function categoryName(id) {
       var c = state.categories.filter(function (x) { return x.categoryId === id; })[0];
       return c ? c.categoryName : "";
     }
-    function currencyOptions(selected) {
-      return state.currencies.map(function (c) {
+    // список валют; пока его нет — «…» и выбор недоступен
+    function renderCurrencies(selected) {
+      var sel = el("currency");
+      if (!state.currencies.length) { sel.innerHTML = '<option value="">…</option>'; sel.disabled = true; sel.classList.add("loading"); return; }
+      if (state.currencies.indexOf(selected) < 0) selected = state.currencies.indexOf("RSD") > -1 ? "RSD" : state.currencies[0];
+      sel.innerHTML = state.currencies.map(function (c) {
         return '<option value="' + esc(c) + '"' + (c === selected ? " selected" : "") + ">" + esc(c) + "</option>";
       }).join("");
+      sel.disabled = false;
+      sel.classList.remove("loading");
     }
 
     // ---------- форма ----------
@@ -294,6 +409,7 @@
       setSign(Number(d.amount) > 0 ? 1 : -1);
       el("amount").value = Math.abs(Number(d.amount)) || "";
       updateClear();
+      if (d.currencyId) state.wantCurrency = d.currencyId; // если валют ещё нет — выберем, когда загрузятся
       if (state.currencies.indexOf(d.currencyId) > -1) el("currency").value = d.currencyId;
       pickCategory(d.categoryId || "");
     }
@@ -303,11 +419,15 @@
       updateClear();
       pickCategory("");
       state.prefill = null;
+      state.wantCurrency = "";
       formChanged();
+      state.touched = false;
     }
-    // убрать данные траты из адресной строки, чтобы обновление страницы не подставило их снова
+    // убрать данные траты из адресной строки и из вкладки, чтобы обновление страницы не подставило их снова
     function clearUrl() {
       try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {}
+      state.smsText = "";
+      session("sms", null);
     }
 
     // крестик в поле суммы: стирает только сумму
@@ -315,29 +435,30 @@
     function clearAmount() {
       el("amount").value = "";
       updateClear();
-      formChanged();
+      formChanged(true);
       el("amount").focus();
     }
-    el("amount").addEventListener("input", function () { updateClear(); formChanged(); });
-    el("currency").addEventListener("change", formChanged);
+    el("amount").addEventListener("input", function () { updateClear(); formChanged(true); });
+    el("currency").addEventListener("change", function () { state.wantCurrency = ""; formChanged(true); });
 
-    // вставка текста банка в поле суммы — разбираем и заполняем форму
+    // вставка текста банка в поле суммы — разбираем прямо на странице и заполняем форму
     el("amount").addEventListener("paste", function (e) {
       if (state.editing) return;
       var text = (e.clipboardData || window.clipboardData).getData("text") || "";
       if (/^\s*[-+]?[\d\s.,]+\s*$/.test(text)) return; // обычное число — вставляем как есть
       e.preventDefault();
-      call("apiParseText", [text], function (r) {
-        if (!r.ok) { toast(r.error, true); return; }
-        fillForm({ amount: r.amount, currencyId: r.currencyId, categoryId: r.suggestedCategoryId });
-        state.prefill = { merchant: r.merchant || "", textKey: r.textKey || "" };
-      });
+      var r = parseBankText(text);
+      if (!r) { toast(state.loaded ? "Не нашёл сумму и валюту в тексте" : "Справочники ещё загружаются — попробуйте через пару секунд", true); return; }
+      fillForm({ amount: r.amount, currencyId: r.currencyId, categoryId: merchantCategory(r.merchant) });
+      state.prefill = { merchant: r.merchant || "" };
+      state.touched = true;
     });
 
     function readForm() {
       var raw = el("amount").value.trim().replace(/\s/g, "").replace(",", ".").replace(/^[-+]/, "");
       var amount = Number(raw);
       if (!raw || !isFinite(amount) || amount === 0) { toast("Введите сумму", true); el("amount").focus(); return null; }
+      if (!state.loaded) { toast("Справочники ещё загружаются — подождите пару секунд", true); return null; }
       if (!state.categoryId) { toast("Выберите категорию", true); return null; }
       return { amount: state.sign * Math.abs(amount), currencyId: el("currency").value, categoryId: state.categoryId };
     }
@@ -358,7 +479,6 @@
       }
       var p = state.prefill || {};
       form.merchant = p.merchant || "";
-      form.textKey = p.textKey || "";
       // тот же id при повторном нажатии после обрыва связи — сервер не запишет трату второй раз
       if (!state.pendingId) state.pendingId = newId();
       form.id = state.pendingId;
@@ -382,7 +502,7 @@
       if (state.deleting > -1) return;
       var r = state.recent[i];
       if (!r) return;
-      state.savedNew = { amount: el("amount").value, sign: state.sign, categoryId: state.categoryId, currencyId: el("currency").value, prefill: state.prefill, pendingId: state.pendingId };
+      state.savedNew = { amount: el("amount").value, sign: state.sign, categoryId: state.categoryId, currencyId: el("currency").value, prefill: state.prefill, pendingId: state.pendingId, touched: state.touched };
       state.editing = { row: r.row, expected: { date: r.date, amount: r.amount, currencyId: r.currencyId } };
       state.prefill = null;
       fillForm({ amount: r.amount, currencyId: r.currencyId, categoryId: r.categoryId });
@@ -403,6 +523,7 @@
         setSign(s.sign); el("amount").value = s.amount; updateClear(); el("currency").value = s.currencyId; pickCategory(s.categoryId);
         state.prefill = s.prefill;
         state.pendingId = s.pendingId;
+        state.touched = s.touched;
         state.savedNew = null;
       } else resetForm();
       showTab("history");
@@ -506,6 +627,7 @@
       return d.toLocaleDateString("ru-RU", opts);
     }
     function renderHistory(items) {
+      if (items === null) { el("historyList").innerHTML = pendingBlock("pending tall"); return; } // ещё грузится
       state.recent = items || [];
       swipe.openRow = null;
       cacheInit({ recent: state.recent });
@@ -528,28 +650,33 @@
     }
 
     // ---------- параметры ссылки (после "#") ----------
-    // amt — сумма, cur — валюта, shop — магазин, cat — категория, key — отпечаток СМС, tab=history,
-    // t — ключ доступа, api — адрес сервера: их запоминаем на устройстве и сразу убираем из адресной строки
+    // sms — текст СМС от шортката (разбираем здесь, на странице);
+    // amt — сумма, cur — валюта, shop — магазин, cat — категория (старый формат ссылки от сервера), tab=history,
+    // t — ключ доступа, api — адрес сервера: их запоминаем на устройстве.
+    // Ключ, адрес и текст СМС сразу убираем из адресной строки.
     function readParams() {
       var q = {};
       try { new URLSearchParams(location.hash.replace(/^#/, "")).forEach(function (v, k) { q[k] = v; }); } catch (e) {}
-      if (q.t || q.api) {
+      if (q.t || q.api || q.sms) {
         if (q.t) store("token", q.t);
         if (isApiUrl(q.api)) store("api", q.api);
+        if (q.sms) session("sms", q.sms);
         var rest = new URLSearchParams();
-        Object.keys(q).forEach(function (k) { if (k !== "t" && k !== "api") rest.append(k, q[k]); });
+        Object.keys(q).forEach(function (k) { if (k !== "t" && k !== "api" && k !== "sms") rest.append(k, q[k]); });
         var hash = rest.toString();
         try { history.replaceState(null, "", location.pathname + location.search + (hash ? "#" + hash : "")); } catch (e) {}
         delete q.t;
         delete q.api;
       }
+      // после обновления страницы текст СМС берём из вкладки
+      if (!q.sms && !q.amt) q.sms = session("sms") || "";
       return q;
     }
 
-    // ---------- кэш на устройстве: категории, валюты и последняя история ----------
+    // ---------- кэш на устройстве: категории, валюты, магазины и последняя история ----------
     // Страница сразу рисуется из кэша, а свежие данные с сервера приходят фоном.
     function readCache() {
-      if (!store("token") || !isApiUrl(store("api"))) return null;
+      if (!hasAccess()) return null;
       try { var c = JSON.parse(store("init") || "null"); return c && c.categories && c.currencies ? c : null; } catch (e) { return null; }
     }
     function cacheInit(part) {
@@ -558,65 +685,81 @@
       try { store("init", JSON.stringify(Object.assign(c || {}, part))); } catch (e) {}
     }
 
+    // ---------- подстановка траты из ссылки или СМС ----------
+    // Вызывается сразу при открытии и ещё раз, когда пришли справочники: до этого могут быть
+    // неизвестны валюты (общий формат СМС) и категории магазинов. Ввод пользователя не перезаписываем.
+    function applyPrefill() {
+      if (state.editing) return;
+      var q = params, p = null;
+      if (q.amt) p = { amount: q.amt, currencyId: q.cur, categoryId: q.cat || "", merchant: q.shop || "" };
+      else if (state.smsText) {
+        var r = parseBankText(state.smsText);
+        if (r) p = { amount: r.amount, currencyId: r.currencyId, categoryId: merchantCategory(r.merchant), merchant: r.merchant };
+        else if (state.loaded && !state.smsFailShown) { state.smsFailShown = true; toast("Не удалось разобрать СМС — заполните вручную", true); }
+      }
+      if (!p) return;
+      if (state.touched) {
+        // пользователь уже что-то менял — только подсказываем категорию, если он её ещё не выбрал
+        if (!state.categoryId && p.categoryId) pickCategory(p.categoryId);
+        return;
+      }
+      fillForm(p);
+      state.prefill = { merchant: p.merchant || "" };
+    }
+
     // ---------- загрузка ----------
     var params = readParams();
-    var booted = false;
+    state.smsText = params.sms || "";
+
+    // справочники пришли (из кэша или с сервера) — обновляем, не сбивая то, что пользователь уже выбрал
     function applyData(data) {
+      var cur = el("currency").value || state.wantCurrency || store("currency") || "";
+      if (state.wantCurrency && !state.touched) cur = state.wantCurrency;
       state.categories = data.categories || [];
       state.currencies = data.currencies || [];
+      state.merchants = data.merchants || state.merchants || {};
       state.todayKey = data.todayKey || state.todayKey || "";
-    }
-    // первая отрисовка — из кэша или с сервера
-    function start(data) {
-      var q = params;
-      booted = true;
-      applyData(data);
-      var cur = store("currency") || (data.currencies.indexOf("RSD") > -1 ? "RSD" : data.currencies[0]);
-      el("currency").innerHTML = currencyOptions(cur);
-      renderCategories();
-      setSign(-1);
-      if (q.amt) {
-        fillForm({ amount: q.amt, currencyId: q.cur, categoryId: q.cat });
-        state.prefill = { merchant: q.shop || "", textKey: q.key || "" };
-      }
-      renderHistory(data.recent);
-      if (q.tab === "history") showTab("history");
-      el("loader").classList.add("hidden");
-      el("app").classList.remove("hidden");
-    }
-    // свежие данные после отрисовки из кэша — обновляем, не сбивая то, что пользователь уже выбрал
-    function refresh(data) {
-      var cur = el("currency").value;
-      applyData(data);
-      el("currency").innerHTML = currencyOptions(state.currencies.indexOf(cur) > -1 ? cur : (store("currency") || state.currencies[0]));
+      state.loaded = true;
+      state.loadError = "";
+      renderCurrencies(cur);
       if (!state.categories.some(function (c) { return c.categoryId === state.categoryId; })) state.categoryId = "";
       renderCategories();
-      if (!state.editing && state.deleting < 0 && !swipe.openRow && !swipe.row) renderHistory(data.recent);
+      if (!state.editing && state.deleting < 0 && !swipe.openRow && !swipe.row) renderHistory(data.recent || []);
+      applyPrefill();
     }
+
     function load() {
-      booted = false;
-      var cached = readCache();
-      if (cached) start(cached);
-      else {
-        el("spinner").classList.remove("hidden");
-        el("loaderText").textContent = "";
-        el("retryBtn").classList.add("hidden");
-      }
+      if (!state.loaded) { state.loadError = ""; renderCategories(); renderHistory(null); }
       call("apiGetInitData", [], function (data) {
-        cacheInit({ categories: data.categories, currencies: data.currencies, recent: data.recent, todayKey: data.todayKey });
-        if (booted) refresh(data); else start(data);
+        cacheInit({ categories: data.categories, currencies: data.currencies, merchants: data.merchants || {}, recent: data.recent, todayKey: data.todayKey });
+        applyData(data);
       }, function (msg) {
-        if (booted) return; // уже показали из кэша — ошибку увидят при сохранении
-        el("spinner").classList.add("hidden");
-        el("loaderText").textContent = msg;
-        el("retryBtn").classList.remove("hidden");
+        if (state.loaded) return; // уже показали из кэша — ошибку увидят при сохранении
+        state.loadError = msg;
+        renderCategories();
+        renderHistory(null);
       });
     }
+
+    // форма показывается сразу; чего ещё нет — крутится индикатор, пока данные грузятся фоном
+    function boot() {
+      if (!hasAccess()) { noAccess("Откройте форму через шорткат «Бюджет»"); return; }
+      el("loader").classList.add("hidden");
+      el("app").classList.remove("hidden");
+      setSign(-1);
+      renderCurrencies(store("currency") || "");
+      var cached = readCache();
+      if (cached) applyData(cached);
+      else { renderCategories(); renderHistory(null); applyPrefill(); } // формат банка разбирается и без справочников
+      if (params.tab === "history") showTab("history");
+      load();
+    }
+
     // шорткат открыл новую ссылку на уже открытой странице — перечитываем её
     window.addEventListener("hashchange", function () { location.reload(); });
 
     updateThemeBtn();
-    load();
+    boot();
   </script>
 </body>
 </html>
