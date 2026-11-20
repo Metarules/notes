@@ -410,7 +410,10 @@
     // над плавающей панелью браузера (FIT_RESERVE). Не меньше FIT_MIN — иначе кнопки мелкие
     // и страницу просто можно прокрутить; не больше FIT_MAX — на больших экранах.
     // Если места мало даже для FIT_NORMAL_MIN, кнопки становятся компактными (эмодзи слева) — до FIT_COMPACT_MIN.
-    var FIT_RESERVE = 80, FIT_NORMAL_MIN = 48, FIT_COMPACT_MIN = 34, FIT_MAX = 72, fitQueued = false, lastSize = { w: 0, h: 0 };
+    // После первой подгонки мелкие расхождения (меньше FIT_TOLERANCE точек на всю страницу) не трогаем:
+    // окно браузера после открытия чуть меняет высоту, и без допуска кнопки заметно «прыгают».
+    var FIT_RESERVE = 80, FIT_NORMAL_MIN = 48, FIT_COMPACT_MIN = 34, FIT_MAX = 72, FIT_TOLERANCE = 12;
+    var fitQueued = false, fitDone = false, lastSize = { w: 0, h: 0 };
     function scheduleFit() {
       if (fitQueued) return;
       fitQueued = true;
@@ -423,7 +426,10 @@
       var rows = Math.ceil(chips.length / cols);
       var cur = chips[0].getBoundingClientRect().height; // фактическая высота (может быть больше min-height из-за содержимого)
       var bottom = el("saveBtn").getBoundingClientRect().bottom + window.pageYOffset;
-      var ideal = Math.floor(cur + (window.innerHeight - FIT_RESERVE - bottom) / rows);
+      var slack = window.innerHeight - FIT_RESERVE - bottom; // сколько места осталось (минус — не помещается)
+      if (fitDone && Math.abs(slack) < FIT_TOLERANCE) return;
+      fitDone = true;
+      var ideal = Math.floor(cur + slack / rows);
       var compact = ideal < FIT_NORMAL_MIN;
       grid.classList.toggle("compact", compact);
       var h = Math.max(compact ? FIT_COMPACT_MIN : FIT_NORMAL_MIN, Math.min(FIT_MAX, ideal));
