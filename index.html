@@ -98,8 +98,12 @@
     /* пока данные грузятся фоном — индикаторы на месте категорий, валюты и истории */
     .spinner.sm { width:22px; height:22px; border-width:2px; }
     /* нет связи с сервером — плашка над формой, держится, пока связь не вернётся */
-    .netbar { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; padding:10px 12px; border-radius:12px; background:var(--warn-bg); color:var(--warn); font-size:14px; }
-    .netbar button { border:0; background:transparent; color:inherit; font-weight:600; font-size:14px; padding:4px 2px; white-space:nowrap; }
+    .netbar { display:flex; align-items:center; gap:12px; margin-bottom:12px; padding:10px 12px 10px 14px; border-radius:12px; background:var(--warn-bg); color:var(--warn); }
+    .netbar .nb-text { flex:1; min-width:0; line-height:1.3; }
+    .netbar .nb-title { display:block; font-size:15px; font-weight:600; }
+    .netbar .nb-sub { display:block; font-size:13px; opacity:.85; margin-top:1px; }
+    /* кнопка — отдельный «пилюлей» с рамкой, чтобы не читалась как продолжение текста */
+    .netbar button { flex:0 0 auto; border:1px solid currentColor; border-radius:999px; background:transparent; color:inherit; font-weight:600; font-size:14px; padding:6px 14px; white-space:nowrap; }
     .netbar button:disabled { opacity:.5; }
     /* траты из очереди на телефоне — в истории сверху, приглушённо */
     .row.queued .tx { opacity:.75; }
@@ -119,7 +123,7 @@
 
   <div id="app" class="wrap hidden">
     <div id="netBar" class="netbar hidden" role="status">
-      <span id="netText">Нет связи с сервером</span>
+      <div class="nb-text"><span class="nb-title">Нет связи</span><span id="netText" class="nb-sub"></span></div>
       <button id="netRetry" onclick="load()">Повторить</button>
     </div>
     <nav id="tabs" class="tabs">
@@ -414,8 +418,8 @@
     function updateNetBar() {
       var n = outbox().filter(function (x) { return !x.error; }).length;
       el("netText").textContent = n
-        ? "Нет связи — " + n + " " + plural(n, "операция ждёт", "операции ждут", "операций ждут") + " отправки"
-        : "Нет связи — операции сохранятся на телефоне";
+        ? n + " " + plural(n, "операция ждёт", "операции ждут", "операций ждут") + " отправки"
+        : "Операции сохранятся на телефоне";
       el("netBar").classList.toggle("hidden", !state.offline);
     }
 
