@@ -306,6 +306,11 @@
       return "";
     }
 
+    // похоже ли на сообщение банка — по словам из его СМС (Placeno kart.br. … / Raspolozivo: …)
+    function looksLikeBankText(text) {
+      return /\bpla[cć]eno\b|kart\.?\s*br|raspolo/i.test(String(text || ""));
+    }
+
     // { amount, currencyId, merchant } или null. Формат банка разбирается сразу,
     // общий формат («500 RSD …») — только когда известен список валют.
     function parseBankText(text) {
@@ -329,6 +334,8 @@
       var codeRe = codes.join("|");
       var num = "(\\d{1,3}(?:[ .,']\\d{3})+(?:[.,]\\d{1,2})?|\\d+(?:[.,]\\d{1,2})?)";
 
+      // остаток на счёте («Raspoloživo: RSD …») — никогда не сумма траты: дальше его не смотрим
+      t = t.replace(/raspolo[žz]ivo[\s\S]*$/i, "");
       var amountStr = "", currencyId = "", matched = "";
       // перед суммой — начало строки или не цифра (вместо lookbehind, которого нет в старом Safari)
       var m = t.match(new RegExp("(?:^|[^\\d.,])" + num + "\\s*(" + codeRe + ")\\b", "i"));
@@ -705,7 +712,12 @@
       else if (state.smsText) {
         var r = parseBankText(state.smsText);
         if (r) p = { amount: r.amount, currencyId: r.currencyId, categoryId: merchantCategory(r.merchant), merchant: r.merchant };
-        else if (state.loaded && !state.smsFailShown) { state.smsFailShown = true; toast("В тексте нет суммы с валютой — введите вручную", false, 4000); } // текст мог прийти не из СМС, а из буфера — без красного и без слова «СМС»
+        else if (state.loaded && !state.smsFailShown && looksLikeBankText(state.smsText)) {
+          // подсказываем, только если это явно сообщение банка (например, банк поменял формат);
+          // любой другой текст из буфера молча оставляет форму пустой
+          state.smsFailShown = true;
+          toast("Не получилось разобрать сообщение банка — введите сумму вручную", false, 4000);
+        }
       }
       if (!p) return;
       if (state.touched) {
