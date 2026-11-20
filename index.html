@@ -175,6 +175,15 @@
       toast.timer = setTimeout(function () { t.className = "toast" + (isError ? " err" : ""); }, ms || (isError ? 5000 : 2500));
     }
 
+    // любое касание страницы или нажатие клавиши убирает уведомление: пользователь уже приступил к делу.
+    // Новое уведомление от этого же касания (например, ошибка при сохранении) появится уже после.
+    function hideToast() {
+      clearTimeout(toast.timer);
+      el("toast").classList.remove("show");
+    }
+    document.addEventListener("pointerdown", hideToast, true);
+    document.addEventListener("keydown", hideToast, true);
+
     function setSaving(on) {
       var b = el("saveBtn");
       b.disabled = on;
