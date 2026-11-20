@@ -27,9 +27,9 @@
   </script>
   <style>
     :root { --bg:#f6f7f9; --card:#fff; --field:#fff; --text:#1d1f23; --muted:#8a9099; --accent:#2563eb; --accent-soft:#e8efff; --line:#e5e7eb; --ok:#16a34a; --danger:#dc2626; --toast:#1d1f23;
-      --toast-text:#fff; --shadow:rgba(0,0,0,.06); color-scheme:light; }
+      --toast-text:#fff; --shadow:rgba(0,0,0,.06); --warn:#92400e; --warn-bg:#fef3c7; color-scheme:light; }
     html[data-theme="dark"] { --bg:#111317; --card:#1b1e24; --field:#23272e; --text:#e8eaed; --muted:#9aa0a6; --accent:#3b82f6; --accent-soft:#1e2a44; --line:#2f343c; --ok:#4ade80;
-      --danger:#f87171; --toast:#e8eaed; --toast-text:#111317; --shadow:rgba(0,0,0,.4); color-scheme:dark; }
+      --danger:#f87171; --toast:#e8eaed; --toast-text:#111317; --shadow:rgba(0,0,0,.4); --warn:#fcd34d; --warn-bg:#3a2e12; color-scheme:dark; }
     * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
     html { background:var(--bg); }
     body { margin:0; font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background:var(--bg); color:var(--text); font-size:16px; }
@@ -97,6 +97,10 @@
     .toast.err { background:var(--danger); color:#fff; }
     /* пока данные грузятся фоном — индикаторы на месте категорий, валюты и истории */
     .spinner.sm { width:22px; height:22px; border-width:2px; }
+    /* нет связи с сервером — плашка над формой, держится, пока связь не вернётся */
+    .netbar { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; padding:10px 12px; border-radius:12px; background:var(--warn-bg); color:var(--warn); font-size:14px; }
+    .netbar button { border:0; background:transparent; color:inherit; font-weight:600; font-size:14px; padding:4px 2px; white-space:nowrap; }
+    .netbar button:disabled { opacity:.5; }
     .pending { grid-column:1/-1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; min-height:120px; text-align:center; }
     .pending.tall { min-height:160px; }
     .amount-field select.loading { color:var(--muted); }
@@ -110,6 +114,10 @@
   </div>
 
   <div id="app" class="wrap hidden">
+    <div id="netBar" class="netbar hidden" role="status">
+      <span>Нет связи с сервером — сохранить пока не получится</span>
+      <button id="netRetry" onclick="load()">Повторить</button>
+    </div>
     <nav id="tabs" class="tabs">
       <button id="tab-add" class="active" onclick="showTab('add')">Ввод</button>
       <button id="tab-history" onclick="showTab('history')">История</button>
@@ -147,7 +155,7 @@
     // loaded — справочники (категории, валюты, магазины) уже есть: из кэша на устройстве или с сервера
     // touched — пользователь сам менял форму: фоновая загрузка больше не перезаписывает его ввод
     var state = { categories: [], currencies: [], merchants: {}, recent: [], prefill: null, editing: null, savedNew: null, deleting: -1, sign: -1, categoryId: "", todayKey: "",
-      pendingId: null, loaded: false, loadError: "", touched: false, smsText: "", smsFailShown: false };
+      pendingId: null, loaded: false, loadError: "", offline: false, touched: false, smsText: "", smsFailShown: false };
 
     function el(id) { return document.getElementById(id); }
     function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
@@ -227,7 +235,12 @@
         })
         .then(function (res) {
           clearTimeout(timer);
-          if (res && res.ok) { onOk(res.result, res); return; }
+          setOnline(true); // сервер ответил — связь есть
+          if (res && res.ok) {
+            // ошибка в обработчике — не «нет связи»: выпускаем её отдельно, мимо catch ниже
+            try { onOk(res.result, res); } catch (err) { setTimeout(function () { throw err; }); }
+            return;
+          }
           if (res && res.auth === false) {
             store("token", null); // ключ не подошёл — забываем его и кэш данных
             store("init", null);
@@ -238,8 +251,9 @@
         })
         .catch(function (e) {
           clearTimeout(timer);
-          if (e && e.server) fail(e.server);
-          else if (e && e.name === "AbortError") fail("Сервер не ответил — попробуйте ещё раз");
+          if (e && e.server) { setOnline(true); fail(e.server); return; } // ответила страница ошибки Google — связь есть
+          setOnline(false);
+          if (e && e.name === "AbortError") fail("Сервер не ответил — попробуйте ещё раз");
           else fail("Нет связи с сервером");
         });
     }
@@ -380,9 +394,22 @@
     }
     function toggleSign() { setSign(-state.sign); formChanged(true); }
 
+    // ---------- связь с сервером: плашка «Нет связи» ----------
+    function setOnline(on) {
+      var changed = state.offline === !!on;
+      state.offline = !on;
+      el("netBar").classList.toggle("hidden", !!on);
+      if (changed && !state.loaded) { renderCategories(); renderHistory(null); }
+    }
+    // телефон снова в сети — сразу пробуем загрузить; пропала сеть — сразу показываем плашку
+    window.addEventListener("online", function () { load(); });
+    window.addEventListener("offline", function () { setOnline(false); });
+
     // ---------- индикаторы загрузки ----------
     // пока справочников нет: в сетке категорий — индикатор или ошибка с кнопкой «Повторить»
     function pendingBlock(cls) {
+      // нет связи — о ней уже говорит плашка сверху, здесь только тихая пометка
+      if (state.offline) return '<div class="' + cls + '"><span class="muted">Загрузится, когда появится связь</span></div>';
       if (state.loadError) return '<div class="' + cls + '"><span class="muted">' + esc(state.loadError) + '</span><button class="link" style="width:auto;margin:0" onclick="load()">Повторить</button></div>';
       return '<div class="' + cls + '"><span class="spinner sm"></span></div>';
     }
@@ -752,11 +779,14 @@
 
     function load() {
       if (!state.loaded) { state.loadError = ""; renderCategories(); renderHistory(null); }
+      el("netRetry").disabled = true;
       call("apiGetInitData", [], function (data) {
+        el("netRetry").disabled = false;
         cacheInit({ categories: data.categories, currencies: data.currencies, merchants: data.merchants || {}, recent: data.recent, todayKey: data.todayKey });
         applyData(data);
       }, function (msg) {
-        if (state.loaded) return; // уже показали из кэша — ошибку увидят при сохранении
+        el("netRetry").disabled = false;
+        if (state.loaded) return; // данные из кэша уже на экране; если нет связи — об этом говорит плашка
         state.loadError = msg;
         renderCategories();
         renderHistory(null);
@@ -770,6 +800,7 @@
       el("app").classList.remove("hidden");
       setSign(-1);
       renderCurrencies(store("currency") || "");
+      if (navigator.onLine === false) setOnline(false); // телефон офлайн — говорим сразу, не дожидаясь запроса
       var cached = readCache();
       if (cached) applyData(cached);
       else { renderCategories(); renderHistory(null); applyPrefill(); } // формат банка разбирается и без справочников
