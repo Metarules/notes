@@ -70,7 +70,8 @@
     .amount-field select { display:none; }
     .amount-field .cur-btn { flex:0 0 86px; border:0; border-left:1px solid var(--line); background:transparent; color:var(--text); font-size:17px; padding:0 8px; }
     .amount-field .cur-btn:disabled { color:var(--muted); }
-    .amount-field .cur-btn .caret { font-size:11px; color:var(--muted); margin-left:4px; }
+    .amount-field .cur-btn { display:flex; align-items:center; justify-content:center; gap:4px; }
+    .amount-field .cur-btn .caret { width:18px; height:18px; flex:0 0 auto; color:var(--muted); }
     #view-add .card { position:relative; margin-bottom:6px; }
     /* выпадающий список валют: столбик под кнопкой, у правого края; крупные коды, у текущей — галочка */
     .cur-panel { position:absolute; right:12px; width:150px; z-index:5; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:4px 0;
@@ -662,7 +663,7 @@
     // Значение хранится в скрытом <select id="currency"> — остальной код читает его как раньше.
     function syncCurBtn() {
       var sel = el("currency"), b = el("curBtn");
-      b.innerHTML = sel.disabled || !sel.value ? "…" : esc(sel.value) + '<span class="caret">▾</span>';
+      b.innerHTML = sel.disabled || !sel.value ? "…" : esc(sel.value) + '<svg class="caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
       b.disabled = sel.disabled;
     }
     function setCurrency(c) {
