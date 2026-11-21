@@ -752,7 +752,7 @@
       var r = parseBankText(text);
       if (!r) { toast(state.loaded ? "В тексте нет суммы с валютой — введите вручную" : "Справочники ещё загружаются — попробуйте через пару секунд", false, 4000); return; }
       fillForm({ amount: r.amount, currencyId: r.currencyId, categoryId: merchantCategory(r.merchant) });
-      state.prefill = { merchant: r.merchant || "" };
+      state.prefill = { merchant: r.merchant || "", fromClip: true }; // вставили из буфера — после сохранения очистим его
       state.touched = true;
     });
 
@@ -788,6 +788,10 @@
       }
       var p = state.prefill || {};
       form.merchant = p.merchant || "";
+      // текст банка был взят из буфера обмена — чистим буфер, чтобы следующий запуск не подставил ту же операцию.
+      // Делаем сразу, пока идёт нажатие на кнопку: позже браузер запись в буфер не разрешит.
+      // Операция в любом случае не потеряется: без связи она уходит в очередь на телефоне.
+      if (p.fromClip) clearClipboard();
       // тот же id при повторном нажатии после обрыва связи — сервер не запишет трату второй раз;
       // время — момент первого нажатия: так трата из очереди получит время покупки
       if (!state.pendingId) { state.pendingId = newId(); state.pendingAt = new Date().toISOString(); }
@@ -807,6 +811,19 @@
         if (kind === "network") { saveToPhone(form); return; }
         toast(msg, true);
       });
+    }
+    function clearClipboard() {
+      function fallback() {
+        try {
+          var t = document.createElement("textarea");
+          t.value = " "; t.setAttribute("readonly", ""); t.style.cssText = "position:fixed;top:-100px;opacity:0";
+          document.body.appendChild(t); t.select(); document.execCommand("copy"); t.remove();
+        } catch (e) {}
+      }
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText("").catch(fallback); return; }
+      } catch (e) {}
+      fallback();
     }
     // нет связи — трата в очередь на телефоне, форма очищается как после обычного сохранения
     function saveToPhone(form) {
@@ -1085,7 +1102,8 @@
         return;
       }
       fillForm(p);
-      state.prefill = { merchant: p.merchant || "" };
+      // src=clip — шорткат взял текст из буфера обмена: после сохранения буфер очистим
+      state.prefill = { merchant: p.merchant || "", fromClip: !q.amt && q.src === "clip" };
     }
 
     // ---------- загрузка ----------
