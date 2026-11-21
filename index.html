@@ -271,7 +271,8 @@
       apiAddTransaction: function (form) { return { fn: "add", form: form }; },
       apiAddMany: function (forms) { return { fn: "addMany", forms: forms }; },
       apiUpdateTransaction: function (row, expected, form) { return { fn: "update", row: row, expected: expected, form: form }; },
-      apiDeleteTransaction: function (row, expected) { return { fn: "delete", row: row, expected: expected }; }
+      apiDeleteTransaction: function (row, expected) { return { fn: "delete", row: row, expected: expected }; },
+      apiDeleteById: function (id) { return { fn: "deleteById", id: id }; }
     };
 
     function isApiUrl(u) { return /^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(String(u || "")); }
@@ -628,13 +629,44 @@
       updateNetBar();
       refreshHistory();
     }
+    // Удаление операции из очереди. Если она уже уходила на сервер (sent), сервер мог её записать —
+    // тогда просим удалить её и там (по id); сервер запомнит id и не запишет её, даже если запрос
+    // на запись придёт позже. Пока сервер не ответил, в истории её не показываем.
     function dropQueued(id) {
+      var x = outbox().filter(function (y) { return y.form.id === id; })[0];
+      if (x && x.sent && !x.error) { cancels(cancels().concat([id])); flushCancels(); }
       outbox(outbox().filter(function (x) { return x.form.id !== id; }));
       // строка была открыта свайпом — сбрасываем его, иначе перерисовка истории пропускается
       swipe.openRow = null;
       swipe.row = null;
       updateNetBar();
       refreshHistory();
+    }
+    // id операций, которые надо удалить на сервере (удалены из очереди, когда уже отправлялись)
+    function cancels(list) {
+      if (list === undefined) { try { var l = JSON.parse(store("cancels") || "[]"); return Array.isArray(l) ? l : []; } catch (e) { return []; } }
+      store("cancels", list.length ? JSON.stringify(list) : null);
+    }
+    var cancelling = false;
+    function flushCancels() {
+      var l = cancels();
+      if (cancelling || !l.length || navigator.onLine === false) return;
+      cancelling = true;
+      var id = l[0];
+      call("apiDeleteById", [id], function (res, full) {
+        cancelling = false;
+        cancels(cancels().filter(function (x) { return x !== id; }));
+        if (full && full.recent) state.recent = full.recent;
+        refreshHistory();
+        flushCancels();
+      }, function (msg, kind) {
+        cancelling = false;
+        if (kind !== "network") { // сервер отказал — повтор не поможет; операция останется в истории, удалить можно обычным свайпом
+          cancels(cancels().filter(function (x) { return x !== id; }));
+          refreshHistory();
+          toast("Не удалось удалить на сервере: " + msg, true);
+        }
+      }, { keepalive: true });
     }
     // перерисовать историю, если пользователь сейчас с ней не работает
     function refreshHistory() {
@@ -653,6 +685,8 @@
       }
       flushing = true;
       sendingIds = items.map(function (x) { return x.form.id; });
+      // отмечаем, что они уходили на сервер: удалить их потом — значит удалить и там
+      outbox(outbox().map(function (x) { return sendingIds.indexOf(x.form.id) > -1 ? Object.assign({}, x, { sent: true }) : x; }));
       refreshHistory();
       call("apiAddMany", [items.map(function (x) { return x.form; })], function (res, full) {
         flushing = false;
@@ -671,6 +705,7 @@
         updateNetBar();
         refreshHistory();
         flushOutbox(); // следующая пачка, если очередь была длиннее SEND_BATCH
+        flushCancels();
       }, function (msg, kind) {
         flushing = false;
         var ids = sendingIds;
@@ -987,7 +1022,7 @@
       if (qid) { // трата из очереди: свайп «Удалить» убирает её с телефона, касание ничего не делает
         if (e.target.closest(".swipe-del")) dropQueued(qid);
         else if (swipe.openRow) closeOpenRow();
-        else toast("Отправится, когда будет связь");
+        else toast(sendingIds.indexOf(qid) > -1 ? "Отправляется…" : state.offline ? "Отправится, когда будет связь" : "В очереди на отправку");
         return;
       }
       var i = Number(row.getAttribute("data-i"));
@@ -1080,7 +1115,9 @@
       state.recent = items || [];
       cacheInit({ recent: state.recent });
       var html = queuedHtml(), lastDay = null;
+      var gone = cancels();
       state.recent.forEach(function (r, i) {
+        if (r.id && gone.indexOf(r.id) > -1) return; // удалена, сервер ещё не подтвердил
         if (r.dayKey !== lastDay) { html += dayHead(r.dayKey); lastDay = r.dayKey; }
         var n = Number(r.amount);
         var name = r.categoryName || categoryName(r.categoryId) || "Без категории";
@@ -1190,6 +1227,7 @@
         cacheInit({ categories: data.categories, currencies: data.currencies, merchants: data.merchants || {}, recent: data.recent, todayKey: data.todayKey });
         applyData(data);
         flushOutbox(); // связь есть — отправляем траты, отложенные без связи
+        flushCancels(); // и удаляем на сервере то, что удалили, пока оно отправлялось
       }, function (msg) {
         el("netRetry").disabled = false;
         if (state.loaded) return; // данные из кэша уже на экране; если нет связи — об этом говорит плашка
