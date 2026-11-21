@@ -206,11 +206,10 @@
 
   <script>
     // prefill — данные траты из ссылки шортката, СМС или вставленного текста: { merchant }
-    // pendingId — id новой траты, пока она не сохранена: повторная отправка после обрыва связи не создаст дубль
     // loaded — справочники (категории, валюты, магазины) уже есть: из кэша на устройстве или с сервера
     // touched — пользователь сам менял форму: фоновая загрузка больше не перезаписывает его ввод
     var state = { categories: [], currencies: [], merchants: {}, recent: [], prefill: null, editing: null, savedNew: null, sign: -1, categoryId: "", todayKey: "",
-      pendingId: null, loaded: false, loadError: "", offline: false, touched: false, smsText: "", smsFailShown: false };
+      loaded: false, loadError: "", offline: false, touched: false, smsText: "", smsFailShown: false };
 
     function el(id) { return document.getElementById(id); }
     function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
@@ -280,7 +279,8 @@
 
     var TIMEOUT_MS = 30000; // дольше ответа не ждём: на плохой связи иначе индикатор крутится бесконечно
 
-    function call(fn, args, onOk, onErr) {
+    // opts.keepalive — запрос доходит до сервера, даже если форму закрыли сразу после «Сохранить»
+    function call(fn, args, onOk, onErr, opts) {
       function fail(msg, kind) {
         if (onErr) onErr(msg, kind || "server"); else toast(msg, true);
         setSaving(false);
@@ -293,7 +293,7 @@
       var ctrl = typeof AbortController === "function" ? new AbortController() : null;
       var timer = ctrl ? setTimeout(function () { ctrl.abort(); }, TIMEOUT_MS) : null;
       // text/plain — «простой» запрос без предварительной проверки CORS, Apps Script его принимает
-      fetch(api, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(body), redirect: "follow", credentials: "omit", referrerPolicy: "no-referrer", signal: ctrl ? ctrl.signal : undefined })
+      fetch(api, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(body), redirect: "follow", credentials: "omit", referrerPolicy: "no-referrer", keepalive: !!(opts && opts.keepalive), signal: ctrl ? ctrl.signal : undefined })
         .then(function (r) {
           // Google при сбое (квота, ошибка скрипта) отвечает HTML-страницей, а не JSON
           return r.text().then(function (text) {
@@ -330,10 +330,8 @@
       try { if (window.crypto && crypto.randomUUID) return crypto.randomUUID(); } catch (e) {}
       return Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 12);
     }
-    // форму поменяли — это уже другая трата, нужен новый id; byUser — изменил сам пользователь
+    // форму поменяли; byUser — изменил сам пользователь (фоновая загрузка его ввод больше не перезаписывает)
     function formChanged(byUser) {
-      state.pendingId = null;
-      state.pendingAt = "";
       if (byUser) state.touched = true;
     }
 
@@ -621,9 +619,11 @@
       if (list === undefined) { try { var l = JSON.parse(store("outbox") || "[]"); return Array.isArray(l) ? l : []; } catch (e) { return []; } }
       store("outbox", list.length ? JSON.stringify(list) : null);
     }
-    function enqueue(form) {
+    // off — операция ждала связи: когда уйдёт, скажем об этом («Отправлено с телефона: N»);
+    // обычное мгновенное сохранение уходит молча — «Сохранено» уже было показано
+    function enqueue(form, off) {
       var l = outbox();
-      if (!l.some(function (x) { return x.form.id === form.id; })) l.push({ form: form, error: "" });
+      if (!l.some(function (x) { return x.form.id === form.id; })) l.push({ form: form, error: "", off: !!off });
       outbox(l);
       updateNetBar();
       refreshHistory();
@@ -643,8 +643,9 @@
     // Очередь уходит одним запросом (addMany, до SEND_BATCH операций): сервер пишет их подряд и отвечает по каждой.
     // sendingIds — операции, которые прямо сейчас уходят на сервер (для статуса «отправляется…»)
     var SEND_BATCH = 25, flushing = false, flushedCount = 0, sendingIds = [];
-    function flushOutbox() {
-      if (flushing || state.offline) return;
+    // now — отправить сразу, даже если считаем, что связи нет (после «Сохранить» связь могла вернуться)
+    function flushOutbox(now) {
+      if (flushing || (state.offline && !now) || navigator.onLine === false) return;
       var items = outbox().filter(function (x) { return !x.error; }).slice(0, SEND_BATCH);
       if (!items.length) {
         if (flushedCount) { toast("Отправлено с телефона: " + flushedCount + " " + plural(flushedCount, "операция", "операции", "операций")); flushedCount = 0; }
@@ -661,21 +662,25 @@
         outbox(outbox().map(function (x) {
           var r = byId[x.form.id];
           if (!r) return x;                         // не была в этой пачке — останется в очереди
-          if (r.ok) { flushedCount++; return null; } // записана — убираем из очереди
+          if (r.ok) { if (x.off) flushedCount++; return null; } // записана — убираем из очереди
           errors.push(r.error);                       // сервер отказал (например, категорию удалили) — повтор не поможет
           return { form: x.form, error: r.error };
         }).filter(Boolean));
-        if (errors.length) toast("Не записались из очереди: " + errors.length + " — " + errors[0], true);
+        if (errors.length) toast((errors.length === 1 ? "Операция не записалась: " : "Не записались операции: " + errors.length + " — ") + errors[0], true);
         if (full && full.recent) state.recent = full.recent;
         updateNetBar();
         refreshHistory();
         flushOutbox(); // следующая пачка, если очередь была длиннее SEND_BATCH
       }, function (msg, kind) {
         flushing = false;
+        var ids = sendingIds;
         sendingIds = [];
+        // не ушли — теперь они «ждали связи»: когда отправятся, скажем об этом
+        outbox(outbox().map(function (x) { return ids.indexOf(x.form.id) > -1 ? Object.assign({}, x, { off: true }) : x; }));
+        updateNetBar();
         refreshHistory();
-        if (kind !== "network") toast("Очередь не отправилась: " + msg, true); // без связи — просто подождём
-      });
+        if (kind !== "network") toast("Не отправилось: " + msg + ". Операции остались на телефоне", true);
+      }, { keepalive: true });
     }
     // телефон снова в сети — сразу пробуем загрузить; пропала сеть — сразу показываем плашку
     window.addEventListener("online", function () { load(); });
@@ -857,27 +862,21 @@
       form.merchant = p.merchant || "";
       // текст банка был взят из буфера обмена — чистим буфер, чтобы следующий запуск не подставил ту же операцию.
       // Делаем сразу, пока идёт нажатие на кнопку: позже браузер запись в буфер не разрешит.
-      // Операция в любом случае не потеряется: без связи она уходит в очередь на телефоне.
       if (p.fromClip) clearClipboard();
-      // тот же id при повторном нажатии после обрыва связи — сервер не запишет трату второй раз;
-      // время — момент первого нажатия: так трата из очереди получит время покупки
-      if (!state.pendingId) { state.pendingId = newId(); state.pendingAt = new Date().toISOString(); }
-      form.id = state.pendingId;
-      form.at = state.pendingAt;
-      // телефон точно офлайн — сразу в очередь; иначе пробуем отправить (связь могла уже вернуться)
-      if (navigator.onLine === false) { saveToPhone(form); return; }
-      call("apiAddTransaction", [form], function (res, full) {
-        setSaving(false);
-        store("currency", form.currencyId);
-        resetForm();
-        clearUrl();
-        toast(res.message);
-        showRecent(full);
-        flushOutbox(); // связь есть — заодно отправим то, что лежало в очереди
-      }, function (msg, kind) {
-        if (kind === "network") { saveToPhone(form); return; }
-        toast(msg, true);
-      });
+      // Мгновенное сохранение: операция сразу ложится в очередь на телефоне, форма очищается,
+      // а отправка идёт в фоне. id — защита от дублей (сервер помнит его в столбце «ID»),
+      // время — момент нажатия «Сохранить»: так операция из очереди получит время покупки.
+      form.id = newId();
+      form.at = new Date().toISOString();
+      var offline = navigator.onLine === false;
+      enqueue(form, offline);
+      store("currency", form.currencyId);
+      resetForm();
+      clearUrl();
+      setSaving(false);
+      toast(offline ? "Нет связи — сохранено на телефоне, отправится позже"
+        : "Сохранено: " + fmtNum(form.amount) + " " + form.currencyId + " · " + (categoryName(form.categoryId) || form.categoryId), false, offline ? 3000 : 2000);
+      flushOutbox(true); // пробуем сразу, даже если плашка «Нет связи» ещё висит — связь могла вернуться
     }
     function clearClipboard() {
       function fallback() {
@@ -892,15 +891,6 @@
       } catch (e) {}
       fallback();
     }
-    // нет связи — трата в очередь на телефоне, форма очищается как после обычного сохранения
-    function saveToPhone(form) {
-      setSaving(false);
-      enqueue(form);
-      store("currency", form.currencyId);
-      resetForm();
-      clearUrl();
-      toast("Нет связи — сохранено на телефоне", false, 3000);
-    }
     // сервер присылает свежую историю вместе с ответом; если её нет — запрашиваем отдельно
     function showRecent(full) {
       if (full && full.recent) renderHistory(full.recent);
@@ -911,7 +901,7 @@
     function startEdit(i) {
       var r = state.recent[i];
       if (!r) return;
-      state.savedNew = { amount: el("amount").value, sign: state.sign, categoryId: state.categoryId, currencyId: el("currency").value, prefill: state.prefill, pendingId: state.pendingId, pendingAt: state.pendingAt, touched: state.touched };
+      state.savedNew = { amount: el("amount").value, sign: state.sign, categoryId: state.categoryId, currencyId: el("currency").value, prefill: state.prefill, touched: state.touched };
       state.editing = { row: r.row, expected: { date: r.date, amount: r.amount, currencyId: r.currencyId } };
       state.prefill = null;
       fillForm({ amount: r.amount, currencyId: r.currencyId, categoryId: r.categoryId });
@@ -933,8 +923,6 @@
       if (s) {
         setSign(s.sign); el("amount").value = s.amount; updateClear(); setCurrency(s.currencyId); pickCategory(s.categoryId);
         state.prefill = s.prefill;
-        state.pendingId = s.pendingId;
-        state.pendingAt = s.pendingAt;
         state.touched = s.touched;
         state.savedNew = null;
       } else resetForm();
