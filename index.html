@@ -73,14 +73,14 @@
     .amount-field .cur-btn { display:flex; align-items:center; justify-content:center; gap:4px; }
     .amount-field .cur-btn .caret { width:18px; height:18px; flex:0 0 auto; color:var(--muted); }
     #view-add .card { position:relative; margin-bottom:6px; }
-    /* выпадающий список валют: столбик под кнопкой, у правого края; крупные коды, у текущей — галочка */
+    /* выпадающий список валют, как системное меню iOS: столбик под кнопкой, у текущей — галочка слева, без подсветки; серый фон только под пальцем */
     .cur-panel { position:absolute; right:12px; width:150px; z-index:5; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:4px 0;
       background:var(--card); border:1px solid var(--line); border-radius:14px; box-shadow:0 8px 24px rgba(0,0,0,.25); }
-    .cur-panel button { display:flex; align-items:center; gap:10px; width:100%; min-height:52px; padding:6px 14px; border:0; background:transparent; color:var(--text); text-align:left; }
+    .cur-panel button { display:flex; align-items:center; gap:8px; width:100%; min-height:52px; padding:6px 14px 6px 12px; border:0; background:transparent; color:var(--text); text-align:left; }
     .cur-panel button + button { border-top:1px solid var(--line); }
     .cur-panel .code { flex:1; font-size:20px; font-weight:600; }
-    .cur-panel .check { flex:0 0 18px; color:var(--accent); font-size:18px; font-weight:700; text-align:right; }
-    .cur-panel button.on { background:var(--accent-soft); }
+    .cur-panel .check { flex:0 0 20px; color:var(--text); font-size:18px; font-weight:600; text-align:center; }
+    .cur-panel button:active { background:var(--line); }
     /* сетка категорий */
     .grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-top:10px; }
     .chip { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; min-height:var(--chip-h, 60px); padding:4px; border:1px solid var(--line); border-radius:12px;
@@ -680,8 +680,8 @@
       p.innerHTML = state.currencies.map(function (c, i) {
         var on = c === cur;
         return '<button role="menuitemradio" aria-checked="' + on + '" class="' + (on ? "on" : "") + '" onclick="pickCurrency(' + i + ')">' +
-          '<span class="code">' + esc(c) + '</span>' +
-          '<span class="check" aria-hidden="true">' + (on ? "✓" : "") + '</span></button>';
+          '<span class="check" aria-hidden="true">' + (on ? "✓" : "") + '</span>' +
+          '<span class="code">' + esc(c) + '</span></button>';
       }).join("");
       p.classList.remove("hidden");
       el("curBtn").setAttribute("aria-expanded", "true");
