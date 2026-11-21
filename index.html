@@ -43,7 +43,7 @@
     @keyframes spin { to { transform:rotate(360deg); } }
     /* строка под формой: слева переход в историю, справа тумблер темы */
     .navrow { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:40px; padding:0 2px; }
-    .hist-link { display:inline-flex; align-items:center; gap:5px; border:0; background:transparent; color:var(--accent); font-size:16px; padding:9px 8px 9px 4px; }
+    .hist-link { display:inline-flex; align-items:center; gap:5px; border:0; background:transparent; color:var(--muted); font-size:16px; padding:9px 8px 9px 4px; }
     .hist-link .chev { font-size:20px; line-height:1; margin-left:-1px; }
     .theme-switch { position:relative; flex:0 0 auto; width:58px; height:32px; border:0; border-radius:999px; padding:0; background:var(--line); }
     .theme-switch .ico { position:absolute; top:7px; width:18px; height:18px; color:var(--muted); }
@@ -473,24 +473,41 @@
       fitQueued = true;
       requestAnimationFrame(function () { fitQueued = false; fitLayout(); });
     }
+    // Подгонка сразу доводится до конца (несколько замеров до первой отрисовки): кнопки с переносом подписи
+    // на вторую строку выше остальных, и одного расчёта мало — иначе следующая подгонка (когда через пару
+    // секунд придут свежие данные) двигала бы интерфейс.
     function fitLayout() {
       var grid = el("catGrid"), chips = grid.querySelectorAll(".chip");
       if (!chips.length || el("view-add").classList.contains("hidden")) return;
-      var cols = getComputedStyle(grid).gridTemplateColumns.split(" ").length || 3;
-      var rows = Math.ceil(chips.length / cols);
-      var cur = chips[0].getBoundingClientRect().height; // фактическая высота (может быть больше min-height из-за содержимого)
+      var root = document.documentElement;
       // на экране должна помещаться строка «История» под кнопкой (при изменении операции её нет — тогда сама кнопка)
       var anchor = el("navRow").offsetParent ? el("navRow") : el("saveBtn");
-      var bottom = anchor.getBoundingClientRect().bottom + window.pageYOffset;
-      var slack = window.innerHeight - FIT_RESERVE - bottom; // сколько места осталось (минус — не помещается)
-      if (fitDone && Math.abs(slack) < FIT_TOLERANCE) return;
+      function slack() { return window.innerHeight - FIT_RESERVE - (anchor.getBoundingClientRect().bottom + window.pageYOffset); } // минус — не помещается
+      var s = slack();
+      if (fitDone && Math.abs(s) < FIT_TOLERANCE) return;
       fitDone = true;
-      var ideal = Math.floor(cur + slack / rows);
-      var compact = ideal < FIT_NORMAL_MIN;
-      grid.classList.toggle("compact", compact);
-      var h = Math.max(compact ? FIT_COMPACT_MIN : FIT_NORMAL_MIN, Math.min(FIT_MAX, ideal));
-      document.documentElement.style.setProperty("--chip-h", h + "px");
+      var cols = getComputedStyle(grid).gridTemplateColumns.split(" ").length || 3;
+      var rows = Math.ceil(chips.length / cols);
+      // подбираем высоту в заданном виде кнопок; возвращает, сколько места осталось (минус — не поместилось)
+      function fit(compact) {
+        grid.classList.toggle("compact", compact);
+        var lo = compact ? FIT_COMPACT_MIN : FIT_NORMAL_MIN;
+        var h = Math.max(lo, Math.min(FIT_MAX, parseFloat(root.style.getPropertyValue("--chip-h")) || lo));
+        root.style.setProperty("--chip-h", h + "px");
+        var left = slack();
+        for (var k = 0; k < 6 && !(left >= 0 && left < rows); k++) {
+          var nh = Math.max(lo, Math.min(FIT_MAX, Math.floor(h + left / rows)));
+          if (nh === h) break; // упёрлись в предел
+          h = nh;
+          root.style.setProperty("--chip-h", h + "px");
+          left = slack();
+        }
+        return left;
+      }
+      // обычные кнопки (эмодзи над подписью), а если не помещаются даже самые низкие — компактные (эмодзи слева)
+      if (fit(false) < 0) fit(true);
     }
+
     // поворот экрана и смена ширины — пересчёт; изменение высоты при прокрутке (панели браузера) — нет
     window.addEventListener("resize", function () {
       var w = window.innerWidth, hgt = window.innerHeight;
