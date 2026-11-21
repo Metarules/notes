@@ -45,7 +45,7 @@
     .navrow { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:40px; padding:0 2px; }
     .hist-link { display:inline-flex; align-items:center; gap:5px; border:0; background:transparent; color:var(--muted); font-size:16px; padding:9px 8px 9px 4px; }
     .hist-link .chev { font-size:20px; line-height:1; margin-left:-1px; }
-    .theme-switch { position:relative; flex:0 0 auto; width:58px; height:32px; border:0; border-radius:999px; padding:0; background:var(--line); }
+    .theme-switch { -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; position:relative; flex:0 0 auto; width:58px; height:32px; border:0; border-radius:999px; padding:0; background:var(--line); }
     .theme-switch .ico { position:absolute; top:7px; width:18px; height:18px; color:var(--muted); }
     .theme-switch .ico.sun { left:7px; }
     .theme-switch .ico.moon { right:7px; }
@@ -105,6 +105,8 @@
     /* история: слева «Сегодня» / «Вчера» / день недели, справа дата */
     .day { display:flex; justify-content:space-between; align-items:baseline; gap:10px; color:var(--muted); font-size:13px; font-weight:600; margin:24px 4px 10px; }
     .day .dd { font-weight:400; }
+    .diag { position:fixed; inset:12px; z-index:50; overflow:auto; padding:12px; border-radius:14px; background:var(--card); color:var(--text);
+      border:1px solid var(--line); box-shadow:0 8px 24px rgba(0,0,0,.3); font:12px/1.45 ui-monospace, Menlo, monospace; white-space:pre-wrap; }
     .day:first-child { margin-top:0; }
     /* строка истории: карточка сдвигается свайпом влево и открывает кнопку «Удалить» */
     .row { position:relative; margin-bottom:10px; border-radius:14px; overflow:hidden; }
@@ -187,7 +189,7 @@
         <button id="histLink" class="hist-link" onclick="showTab('history')">
           История<span class="chev" aria-hidden="true">›</span>
         </button>
-        <button id="themeSwitch" class="theme-switch" role="switch" aria-checked="false" aria-label="Тёмная тема" onclick="toggleTheme()">
+        <button id="themeSwitch" class="theme-switch" role="switch" aria-checked="false" aria-label="Тёмная тема" onclick="onThemeTap()">
           <svg class="ico sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
           <svg class="ico moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/></svg>
           <span class="knob" id="themeKnob" aria-hidden="true"></span>
@@ -441,6 +443,36 @@
       el("themeSwitch").setAttribute("aria-checked", dark ? "true" : "false");
       el("themeKnob").innerHTML = (dark ? document.querySelector("#themeSwitch .moon") : document.querySelector("#themeSwitch .sun")).outerHTML.replace(/class="[^"]*"/, "");
     }
+    // долгое нажатие на переключатель темы — диагностика размеров окна (для подгонки кнопок под экран)
+    var themeLong = false, themeTimer = null;
+    el("themeSwitch").addEventListener("pointerdown", function () {
+      themeLong = false;
+      themeTimer = setTimeout(function () { themeLong = true; showDiag(); }, 700);
+    });
+    ["pointerup", "pointerleave", "pointercancel"].forEach(function (ev) { el("themeSwitch").addEventListener(ev, function () { clearTimeout(themeTimer); }); });
+    function onThemeTap() { if (themeLong) { themeLong = false; return; } toggleTheme(); }
+    function showDiag() {
+      function probe(css) {
+        var d = document.createElement("div");
+        d.style.cssText = "position:fixed;top:0;left:0;width:1px;visibility:hidden;pointer-events:none;" + css;
+        document.body.appendChild(d);
+        var v = Math.round(d.getBoundingClientRect().height); d.remove(); return v;
+      }
+      var anchor = el("navRow").offsetParent ? el("navRow") : el("saveBtn");
+      var lines = [
+        "Размеры окна (для настройки формы)",
+        "ih " + window.innerHeight + " · iw " + window.innerWidth + " · screen " + screen.width + "×" + screen.height + " · dpr " + window.devicePixelRatio,
+        "svh " + probe("height:100svh") + " · lvh " + probe("height:100lvh") + " · dvh " + probe("height:100dvh") +
+          " · safe↓ " + probe("height:0;padding-bottom:env(safe-area-inset-bottom)") + " · safe↑ " + probe("height:0;padding-top:env(safe-area-inset-top)"),
+        "низ «Истории» " + Math.round(anchor.getBoundingClientRect().bottom) + " · запас под панель " + FIT_RESERVE + " · кнопки " +
+          document.documentElement.style.getPropertyValue("--chip-h") + (el("catGrid").classList.contains("compact") ? " компакт" : ""),
+        "", "Журнал с момента открытия:"
+      ].concat(fitLog, ["", "Нажмите, чтобы закрыть"]);
+      var d = document.createElement("div");
+      d.className = "diag"; d.textContent = lines.join("\n");
+      d.onclick = function () { d.remove(); };
+      document.body.appendChild(d);
+    }
     function toggleTheme() {
       var t = currentTheme() === "dark" ? "light" : "dark";
       document.documentElement.setAttribute("data-theme", t);
@@ -469,6 +501,19 @@
     // окно браузера после открытия чуть меняет высоту, и без допуска кнопки заметно «прыгают».
     var FIT_RESERVE = 80, FIT_NORMAL_MIN = 52, FIT_COMPACT_MIN = 38, FIT_MAX = 76, FIT_TOLERANCE = 12;
     var fitQueued = false, fitDone = false, lastSize = { w: 0, h: 0 };
+    // Первые секунды окно шортката ещё «устаканивается»: высота страницы меняется, пока выезжает лист с формой.
+    // В это время подгоняем по каждому изменению — к моменту, когда вы начинаете вводить, всё уже на месте.
+    // Потом подгонка только при реальных переменах (другое число категорий, поворот, плашка «Нет связи»,
+    // изменение операции) — приход свежих данных с сервера сам по себе ничего не двигает.
+    var FIT_SETTLE_MS = 2500, fitT0 = Date.now(), fitSig = "", fitForce = false;
+    function fitSettling() { return Date.now() - fitT0 < FIT_SETTLE_MS; }
+    // журнал размеров окна для диагностики (долгое нажатие на переключатель темы)
+    var fitLog = [];
+    function fitNote(what) {
+      fitLog.push(((Date.now() - fitT0) / 1000).toFixed(2) + "s " + what + " · ih " + window.innerHeight +
+        (window.visualViewport ? " vv " + Math.round(window.visualViewport.height) : "") + " sh " + screen.height);
+      if (fitLog.length > 30) fitLog.shift();
+    }
     function scheduleFit() {
       if (fitQueued) return;
       fitQueued = true;
@@ -485,8 +530,14 @@
       var anchor = el("navRow").offsetParent ? el("navRow") : el("saveBtn");
       function slack() { return window.innerHeight - FIT_RESERVE - (anchor.getBoundingClientRect().bottom + window.pageYOffset); } // минус — не помещается
       var s = slack();
-      if (fitDone && Math.abs(s) < FIT_TOLERANCE) return;
+      var sig = [chips.length, window.innerWidth, el("netBar").classList.contains("hidden"), anchor.id].join("|");
+      var force = fitForce; fitForce = false;
+      if (fitDone && sig === fitSig && !force) {
+        if (!fitSettling()) return;                    // после «устаканивания» — только при реальных переменах
+        if (Math.abs(s) < FIT_TOLERANCE) return;
+      }
       fitDone = true;
+      fitSig = sig;
       var cols = getComputedStyle(grid).gridTemplateColumns.split(" ").length || 3;
       var rows = Math.ceil(chips.length / cols);
       // подбираем высоту в заданном виде кнопок; возвращает, сколько места осталось (минус — не поместилось)
@@ -506,14 +557,20 @@
         return left;
       }
       // обычные кнопки (эмодзи над подписью), а если не помещаются даже самые низкие — компактные (эмодзи слева)
-      if (fit(false) < 0) fit(true);
+      var left = fit(false);
+      if (left < 0) left = fit(true);
+      fitNote("подгонка " + root.style.getPropertyValue("--chip-h") + (grid.classList.contains("compact") ? " компакт" : "") + " запас " + Math.round(left));
     }
 
     // поворот экрана и смена ширины — пересчёт; изменение высоты при прокрутке (панели браузера) — нет
     window.addEventListener("resize", function () {
       var w = window.innerWidth, hgt = window.innerHeight;
-      if (w !== lastSize.w || (window.pageYOffset === 0 && Math.abs(hgt - lastSize.h) > 120)) { lastSize = { w: w, h: hgt }; scheduleFit(); }
+      fitNote("resize");
+      if (fitSettling()) { lastSize = { w: w, h: hgt }; scheduleFit(); return; }
+      if (w !== lastSize.w || (window.pageYOffset === 0 && Math.abs(hgt - lastSize.h) > 120)) { lastSize = { w: w, h: hgt }; fitForce = true; scheduleFit(); }
     });
+    // в конце «устаканивания» — последняя сверка (если высота поменялась без события resize)
+    setTimeout(function () { fitNote("конец"); fitForce = true; scheduleFit(); }, FIT_SETTLE_MS);
 
     // ---------- знак ----------
     function setSign(s) {
