@@ -117,12 +117,12 @@
     .pdates { display:flex; gap:10px; margin:0 0 12px; }
     .pdates label { flex:1; min-width:0; display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--muted); }
     .pdates input { width:100%; font-size:16px; padding:9px 8px; border:1px solid var(--line); border-radius:10px; background:var(--field); color:var(--text); }
+    /* итог: траты и начисления рядом, одинаковым размером */
+    .stat-sum { display:flex; padding:14px 0; }
+    .stat-sum > div { flex:1; min-width:0; padding:0 14px; }
+    .stat-sum > div + div { border-left:1px solid var(--line); }
     .stat-sum .cap { color:var(--muted); font-size:13px; }
-    .stat-sum .big { font-size:30px; font-weight:700; margin:2px 0 4px; }
-    .stat-sum .sub { color:var(--muted); font-size:14px; }
-    .stat-sum .cmp { font-size:14px; margin-top:8px; }
-    .stat-sum .cmp.less { color:var(--ok); }
-    .stat-sum .cmp.more { color:var(--danger); }
+    .stat-sum .val { font-size:22px; font-weight:700; margin-top:3px; white-space:nowrap; }
     .sect { color:var(--muted); font-size:13px; font-weight:600; margin:20px 4px 8px; }
     .catrow { padding:9px 2px; }
     .catrow + .catrow { border-top:1px solid var(--line); }
@@ -323,7 +323,7 @@
       apiGetInitData: function () { return { fn: "init" }; },
       apiGetRecent: function () { return { fn: "recent" }; },
       apiGetOlder: function (before) { return { fn: "recent", before: before }; },
-      apiGetStats: function (from, to, cmpFrom, cmpTo) { return { fn: "stats", from: from, to: to, cmpFrom: cmpFrom, cmpTo: cmpTo }; },
+      apiGetStats: function (from, to) { return { fn: "stats", from: from, to: to }; },
       apiAddTransaction: function (form) { return { fn: "add", form: form }; },
       apiAddMany: function (forms) { return { fn: "addMany", forms: forms }; },
       apiUpdateTransaction: function (row, expected, form) { return { fn: "update", row: row, expected: expected, form: form }; },
@@ -538,8 +538,7 @@
     // ---------- экраны: ввод (основной) и история (переход — под «Сохранить», назад — стрелкой в шапке) ----------
     // ---------- статистика ----------
     // Вид промежутка: p — отчётный («С 20-го»), m — календарный месяц, y — год, c — свои даты.
-    // offset — сколько промежутков назад (0 — текущий). Сравнение — с предыдущим промежутком той же длины;
-    // для текущего, ещё не закончившегося — с тем же числом дней от начала прошлого.
+    // offset — сколько промежутков назад (0 — текущий); сравнить с прошлым — стрелкой ‹.
     var stats = { pane: "ops", kind: "p", offset: 0, cache: {}, seq: 0 };
     var MON_GEN = ["янв", "фев", "мар", "апр", "мая", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
     var MON_NOM = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
@@ -559,15 +558,6 @@
       }
       if (kind === "m") return { from: mkd(y, m + offset, 1), to: mkd(y, m + offset + 1, 0) };
       return { from: mkd(y + offset, 0, 1), to: mkd(y + offset, 11, 31) };
-    }
-    function compareFor(kind, offset, r) {
-      var prev = kind === "c" ? { from: addDays(r.from, -dayDiff(r.from, r.to) - 1), to: addDays(r.from, -1) } : rangeFor(kind, offset - 1);
-      var t = todayD();
-      if (t >= r.from && t <= r.to) { // промежуток ещё идёт — сравниваем с тем же числом дней
-        var end = addDays(prev.from, dayDiff(r.from, t));
-        if (end < prev.to) prev = { from: prev.from, to: end, partial: true };
-      }
-      return prev;
     }
     function rangeLabel(kind, r) {
       if (kind === "m") return MON_NOM[r.from.getMonth()] + " " + r.from.getFullYear();
@@ -612,36 +602,26 @@
         el("pLabel").textContent = rangeLabel(k, r);
         el("pNext").disabled = stats.offset >= 0;
       }
-      var cmp = compareFor(k, stats.offset, r);
-      var key = [dkey(r.from), dkey(r.to), dkey(cmp.from), dkey(cmp.to)].join("|");
+      var key = dkey(r.from) + "|" + dkey(r.to);
       var cached = stats.cache[key], seq = ++stats.seq;
-      if (cached) renderStats(cached, k, cmp); else el("statsBody").innerHTML = '<div class="pending tall"><span class="spinner sm"></span></div>';
+      if (cached) renderStats(cached); else el("statsBody").innerHTML = '<div class="pending tall"><span class="spinner sm"></span></div>';
       if (navigator.onLine === false || state.offline) {
         if (!cached) el("statsBody").innerHTML = '<div class="pending tall"><span class="muted">Статистика загрузится, когда будет связь</span></div>';
         return;
       }
       // всегда берём свежие цифры: показываем сохранённые сразу, обновляем, когда придёт ответ
-      call("apiGetStats", [dkey(r.from), dkey(r.to), dkey(cmp.from), dkey(cmp.to)], function (res) {
+      call("apiGetStats", [dkey(r.from), dkey(r.to)], function (res) {
         stats.cache[key] = res;
-        if (seq === stats.seq) renderStats(res, k, cmp);
+        if (seq === stats.seq) renderStats(res);
       }, function (msg, kind) {
         if (seq !== stats.seq || cached) return;
         el("statsBody").innerHTML = '<div class="pending tall"><span class="muted">' + esc(kind === "network" ? "Статистика загрузится, когда будет связь" : "Не загрузилось: " + msg) +
           '</span><button class="link" style="width:auto;margin:0" onclick="loadStats()">Повторить</button></div>';
       });
     }
-    function renderStats(res, k, cmp) {
-      var html = '<div class="card stat-sum"><div class="cap">Траты</div><div class="big">' + esc(fmtEur(res.spent)) + '</div>' +
-        '<div class="sub">Начисления: ' + esc(fmtEur(res.income)) + '</div>';
-      var prev = res.compare && res.compare.spent;
-      if (prev > 0 && res.count > 0) {
-        var d = Math.round((res.spent - prev) / prev * 100);
-        var what = { p: ["за прошлый период", "к этому дню в прошлом периоде"], m: ["за прошлый месяц", "к этому дню в прошлом месяце"],
-          y: ["за прошлый год", "к этому дню в прошлом году"], c: ["за такой же срок до этого", "за такой же срок до этого"] }[k][cmp.partial ? 1 : 0];
-        html += d === 0 ? '<div class="cmp">Столько же, сколько ' + what + '</div>'
-          : '<div class="cmp ' + (d < 0 ? "less" : "more") + '">На ' + Math.abs(d) + '% ' + (d < 0 ? "меньше" : "больше") + ', чем ' + what + '</div>';
-      }
-      html += '</div>';
+    function renderStats(res) {
+      var html = '<div class="card stat-sum"><div><div class="cap">Траты</div><div class="val">' + esc(fmtEur(res.spent)) + '</div></div>' +
+        '<div><div class="cap">Начисления</div><div class="val">' + esc(fmtEur(res.income)) + '</div></div></div>';
       if (!res.count) { el("statsBody").innerHTML = html + '<p class="muted" style="text-align:center">Операций за этот промежуток нет</p>'; return; }
       function block(title, key, cls) {
         var list = (res.categories || []).filter(function (c) { return c[key] > 0; }).sort(function (a, b) { return b[key] - a[key]; });
