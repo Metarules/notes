@@ -105,6 +105,34 @@
     /* история: слева «Сегодня» / «Вчера» / день недели, справа дата */
     .day { display:flex; justify-content:space-between; align-items:baseline; gap:10px; color:var(--muted); font-size:13px; font-weight:600; margin:24px 4px 10px; }
     .day .dd { font-weight:400; }
+    /* переключатели: Операции | Статистика и вид периода */
+    .seg { display:flex; background:var(--line); border-radius:10px; padding:3px; margin-bottom:12px; }
+    .seg button { flex:1; min-width:0; border:0; background:transparent; padding:8px 4px; border-radius:8px; font-size:15px; color:var(--muted); white-space:nowrap; }
+    .seg button.on { background:var(--card); color:var(--text); font-weight:600; box-shadow:0 1px 2px rgba(0,0,0,.18); }
+    .seg.kinds button { font-size:14px; padding:7px 2px; }
+    .pnav { display:flex; align-items:center; justify-content:space-between; margin:0 0 10px; }
+    .pnav button { border:0; background:transparent; color:var(--accent); font-size:30px; line-height:1; width:48px; height:40px; }
+    .pnav button:disabled { color:var(--line); }
+    .pnav .lbl { font-size:16px; font-weight:600; text-align:center; }
+    .pdates { display:flex; gap:10px; margin:0 0 12px; }
+    .pdates label { flex:1; min-width:0; display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--muted); }
+    .pdates input { width:100%; font-size:16px; padding:9px 8px; border:1px solid var(--line); border-radius:10px; background:var(--field); color:var(--text); }
+    .stat-sum .cap { color:var(--muted); font-size:13px; }
+    .stat-sum .big { font-size:30px; font-weight:700; margin:2px 0 4px; }
+    .stat-sum .sub { color:var(--muted); font-size:14px; }
+    .stat-sum .cmp { font-size:14px; margin-top:8px; }
+    .stat-sum .cmp.less { color:var(--ok); }
+    .stat-sum .cmp.more { color:var(--danger); }
+    .sect { color:var(--muted); font-size:13px; font-weight:600; margin:20px 4px 8px; }
+    .catrow { padding:9px 2px; }
+    .catrow + .catrow { border-top:1px solid var(--line); }
+    .catrow .top { display:flex; justify-content:space-between; align-items:baseline; gap:8px; font-size:15px; }
+    .catrow .nm { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .catrow .amt { font-weight:600; white-space:nowrap; }
+    .catrow .pct { color:var(--muted); font-weight:400; font-size:13px; margin-left:6px; }
+    .bar { height:6px; background:var(--line); border-radius:3px; margin-top:7px; overflow:hidden; }
+    .bar i { display:block; height:100%; background:var(--accent); border-radius:3px; }
+    .bar.inc i { background:var(--ok); }
     .hist-more { display:flex; flex-direction:column; align-items:center; gap:6px; min-height:64px; padding:16px 0 24px; font-size:14px; text-align:center; }
     .diag { position:fixed; inset:12px; z-index:50; overflow:auto; padding:12px; border-radius:14px; background:var(--card); color:var(--text);
       border:1px solid var(--line); box-shadow:0 8px 24px rgba(0,0,0,.3); font:12px/1.45 ui-monospace, Menlo, monospace; white-space:pre-wrap; }
@@ -199,8 +227,32 @@
     </section>
 
     <section id="view-history" class="hidden">
-      <div id="historyList"></div>
-      <div id="histMore" class="hist-more"></div>
+      <div class="seg" role="tablist">
+        <button id="segOps" class="on" role="tab" onclick="showHistPane('ops')">Операции</button>
+        <button id="segStats" role="tab" onclick="showHistPane('stats')">Статистика</button>
+      </div>
+      <div id="paneOps">
+        <div id="historyList"></div>
+        <div id="histMore" class="hist-more"></div>
+      </div>
+      <div id="paneStats" class="hidden">
+        <div class="seg kinds" id="kindSeg" role="tablist">
+          <button data-k="p" class="on" onclick="setStatsKind('p')"></button>
+          <button data-k="m" onclick="setStatsKind('m')">Месяц</button>
+          <button data-k="y" onclick="setStatsKind('y')">Год</button>
+          <button data-k="c" onclick="setStatsKind('c')">Даты</button>
+        </div>
+        <div class="pnav" id="pNav">
+          <button id="pPrev" onclick="shiftStats(-1)" aria-label="Раньше">‹</button>
+          <span class="lbl" id="pLabel"></span>
+          <button id="pNext" onclick="shiftStats(1)" aria-label="Позже">›</button>
+        </div>
+        <div class="pdates hidden" id="pDates">
+          <label>С<input type="date" id="dFrom" onchange="loadStats()"></label>
+          <label>По<input type="date" id="dTo" onchange="loadStats()"></label>
+        </div>
+        <div id="statsBody"></div>
+      </div>
     </section>
   </div>
 
@@ -271,6 +323,7 @@
       apiGetInitData: function () { return { fn: "init" }; },
       apiGetRecent: function () { return { fn: "recent" }; },
       apiGetOlder: function (before) { return { fn: "recent", before: before }; },
+      apiGetStats: function (from, to, cmpFrom, cmpTo) { return { fn: "stats", from: from, to: to, cmpFrom: cmpFrom, cmpTo: cmpTo }; },
       apiAddTransaction: function (form) { return { fn: "add", form: form }; },
       apiAddMany: function (forms) { return { fn: "addMany", forms: forms }; },
       apiUpdateTransaction: function (row, expected, form) { return { fn: "update", row: row, expected: expected, form: form }; },
@@ -483,6 +536,127 @@
     }
 
     // ---------- экраны: ввод (основной) и история (переход — под «Сохранить», назад — стрелкой в шапке) ----------
+    // ---------- статистика ----------
+    // Вид промежутка: p — отчётный («С 20-го»), m — календарный месяц, y — год, c — свои даты.
+    // offset — сколько промежутков назад (0 — текущий). Сравнение — с предыдущим промежутком той же длины;
+    // для текущего, ещё не закончившегося — с тем же числом дней от начала прошлого.
+    var stats = { pane: "ops", kind: "p", offset: 0, cache: {}, seq: 0 };
+    var MON_GEN = ["янв", "фев", "мар", "апр", "мая", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
+    var MON_NOM = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
+    function periodStartDay() { return state.periodStartDay || 20; }
+    function pad2(n) { return (n < 10 ? "0" : "") + n; }
+    function mkd(y, m, d) { return new Date(y, m, d, 12); } // полдень — без сюрпризов с переводом часов
+    function dkey(d) { return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate()); }
+    function fromKey(k) { var p = String(k || "").split("-").map(Number); return p.length === 3 && p[0] ? mkd(p[0], p[1] - 1, p[2]) : null; }
+    function todayD() { var n = new Date(); return mkd(n.getFullYear(), n.getMonth(), n.getDate()); }
+    function addDays(d, n) { return mkd(d.getFullYear(), d.getMonth(), d.getDate() + n); }
+    function dayDiff(a, b) { return Math.round((b - a) / 86400000); }
+    function rangeFor(kind, offset) {
+      var t = todayD(), y = t.getFullYear(), m = t.getMonth();
+      if (kind === "p") {
+        var S = periodStartDay(), f = mkd(y, (t.getDate() >= S ? m : m - 1) + offset, S);
+        return { from: f, to: mkd(f.getFullYear(), f.getMonth() + 1, S - 1) };
+      }
+      if (kind === "m") return { from: mkd(y, m + offset, 1), to: mkd(y, m + offset + 1, 0) };
+      return { from: mkd(y + offset, 0, 1), to: mkd(y + offset, 11, 31) };
+    }
+    function compareFor(kind, offset, r) {
+      var prev = kind === "c" ? { from: addDays(r.from, -dayDiff(r.from, r.to) - 1), to: addDays(r.from, -1) } : rangeFor(kind, offset - 1);
+      var t = todayD();
+      if (t >= r.from && t <= r.to) { // промежуток ещё идёт — сравниваем с тем же числом дней
+        var end = addDays(prev.from, dayDiff(r.from, t));
+        if (end < prev.to) prev = { from: prev.from, to: end, partial: true };
+      }
+      return prev;
+    }
+    function rangeLabel(kind, r) {
+      if (kind === "m") return MON_NOM[r.from.getMonth()] + " " + r.from.getFullYear();
+      if (kind === "y") return String(r.from.getFullYear());
+      var sameYear = r.from.getFullYear() === r.to.getFullYear();
+      return r.from.getDate() + " " + MON_GEN[r.from.getMonth()] + (sameYear ? "" : " " + r.from.getFullYear()) +
+        " – " + r.to.getDate() + " " + MON_GEN[r.to.getMonth()] + " " + r.to.getFullYear();
+    }
+    function fmtEur(x) {
+      x = Number(x) || 0;
+      return x.toLocaleString("ru-RU", { minimumFractionDigits: 0, maximumFractionDigits: Math.abs(x) >= 100 ? 0 : 2 }) + " €";
+    }
+    function showHistPane(p) {
+      stats.pane = p;
+      el("segOps").classList.toggle("on", p === "ops");
+      el("segStats").classList.toggle("on", p === "stats");
+      el("paneOps").classList.toggle("hidden", p !== "ops");
+      el("paneStats").classList.toggle("hidden", p !== "stats");
+      window.scrollTo(0, 0);
+      if (p === "stats") loadStats(); else setTimeout(checkMore, 0);
+    }
+    function setStatsKind(k) {
+      if (k === "c" && !el("dFrom").value) { // свои даты — начинаем с того, что было на экране
+        var r = stats.kind === "c" ? null : rangeFor(stats.kind, stats.offset);
+        if (r) { el("dFrom").value = dkey(r.from); el("dTo").value = dkey(r.to); }
+      }
+      stats.kind = k; stats.offset = 0;
+      loadStats();
+    }
+    function shiftStats(n) { stats.offset = Math.min(0, stats.offset + n); loadStats(); }
+    function loadStats() {
+      var k = stats.kind, r;
+      el("kindSeg").querySelector('[data-k="p"]').textContent = "С " + periodStartDay() + "-го";
+      [].forEach.call(el("kindSeg").children, function (b) { b.classList.toggle("on", b.getAttribute("data-k") === k); });
+      el("pNav").classList.toggle("hidden", k === "c");
+      el("pDates").classList.toggle("hidden", k !== "c");
+      if (k === "c") {
+        r = { from: fromKey(el("dFrom").value), to: fromKey(el("dTo").value) };
+        if (!r.from || !r.to || r.from > r.to) { el("statsBody").innerHTML = '<p class="muted" style="text-align:center">Выберите даты: «С» не позже «По»</p>'; return; }
+      } else {
+        r = rangeFor(k, stats.offset);
+        el("pLabel").textContent = rangeLabel(k, r);
+        el("pNext").disabled = stats.offset >= 0;
+      }
+      var cmp = compareFor(k, stats.offset, r);
+      var key = [dkey(r.from), dkey(r.to), dkey(cmp.from), dkey(cmp.to)].join("|");
+      var cached = stats.cache[key], seq = ++stats.seq;
+      if (cached) renderStats(cached, k, cmp); else el("statsBody").innerHTML = '<div class="pending tall"><span class="spinner sm"></span></div>';
+      if (navigator.onLine === false || state.offline) {
+        if (!cached) el("statsBody").innerHTML = '<div class="pending tall"><span class="muted">Статистика загрузится, когда будет связь</span></div>';
+        return;
+      }
+      // всегда берём свежие цифры: показываем сохранённые сразу, обновляем, когда придёт ответ
+      call("apiGetStats", [dkey(r.from), dkey(r.to), dkey(cmp.from), dkey(cmp.to)], function (res) {
+        stats.cache[key] = res;
+        if (seq === stats.seq) renderStats(res, k, cmp);
+      }, function (msg, kind) {
+        if (seq !== stats.seq || cached) return;
+        el("statsBody").innerHTML = '<div class="pending tall"><span class="muted">' + esc(kind === "network" ? "Статистика загрузится, когда будет связь" : "Не загрузилось: " + msg) +
+          '</span><button class="link" style="width:auto;margin:0" onclick="loadStats()">Повторить</button></div>';
+      });
+    }
+    function renderStats(res, k, cmp) {
+      var html = '<div class="card stat-sum"><div class="cap">Траты</div><div class="big">' + esc(fmtEur(res.spent)) + '</div>' +
+        '<div class="sub">Начисления: ' + esc(fmtEur(res.income)) + '</div>';
+      var prev = res.compare && res.compare.spent;
+      if (prev > 0 && res.count > 0) {
+        var d = Math.round((res.spent - prev) / prev * 100);
+        var what = { p: ["за прошлый период", "к этому дню в прошлом периоде"], m: ["за прошлый месяц", "к этому дню в прошлом месяце"],
+          y: ["за прошлый год", "к этому дню в прошлом году"], c: ["за такой же срок до этого", "за такой же срок до этого"] }[k][cmp.partial ? 1 : 0];
+        html += d === 0 ? '<div class="cmp">Столько же, сколько ' + what + '</div>'
+          : '<div class="cmp ' + (d < 0 ? "less" : "more") + '">На ' + Math.abs(d) + '% ' + (d < 0 ? "меньше" : "больше") + ', чем ' + what + '</div>';
+      }
+      html += '</div>';
+      if (!res.count) { el("statsBody").innerHTML = html + '<p class="muted" style="text-align:center">Операций за этот промежуток нет</p>'; return; }
+      function block(title, key, cls) {
+        var list = (res.categories || []).filter(function (c) { return c[key] > 0; }).sort(function (a, b) { return b[key] - a[key]; });
+        if (!list.length) return "";
+        var total = res[key === "spent" ? "spent" : "income"], max = list[0][key];
+        return '<div class="sect">' + title + '</div><div class="card">' + list.map(function (c) {
+          var pct = total > 0 ? c[key] / total * 100 : 0;
+          return '<div class="catrow"><div class="top"><span class="nm">' + esc(c.categoryName) + '</span><span class="amt">' + esc(fmtEur(c[key])) +
+            '<span class="pct">' + (pct > 0 && pct < 1 ? "&lt;1" : Math.round(pct)) + '%</span></span></div>' +
+            '<div class="bar ' + cls + '"><i style="width:' + Math.max(1, Math.round(c[key] / max * 100)) + '%"></i></div></div>';
+        }).join("") + '</div>';
+      }
+      el("statsBody").innerHTML = html + block("Траты по категориям", "spent", "") + block("Начисления", "income", "inc");
+    }
+
     function showTab(name) {
       if (state.editing && name === "add") return;
       var h = name === "history";
@@ -492,7 +666,8 @@
       el("histBar").classList.toggle("hidden", !h);
       window.scrollTo(0, 0);
       scheduleFit();
-      if (h) setTimeout(checkMore, 0);
+      if (h && stats.pane === "stats") loadStats(); // свежие цифры — могли добавиться операции
+      else if (h) setTimeout(checkMore, 0);
     }
 
     // ---------- подгонка под высоту экрана ----------
@@ -1057,7 +1232,7 @@
       var old = (state.recent || []).filter(function (x) { return x.row < min && !seen[opKey(x)]; });
       return old.length ? top.concat(old).sort(byDateDesc) : top;
     }
-    function historyVisible() { return !el("view-history").classList.contains("hidden"); }
+    function historyVisible() { return !el("view-history").classList.contains("hidden") && stats.pane === "ops"; }
     function loadOlder() {
       if (hist.loading || hist.done || hist.failed || !state.loaded || !historyVisible()) return;
       if (state.offline || navigator.onLine === false) { renderMore(); return; }
@@ -1281,6 +1456,7 @@
       state.currencies = data.currencies || [];
       state.merchants = data.merchants || state.merchants || {};
       state.todayKey = data.todayKey || state.todayKey || "";
+      if (data.periodStartDay) state.periodStartDay = data.periodStartDay;
       state.loaded = true;
       state.loadError = "";
       renderCurrencies(cur);
@@ -1296,7 +1472,7 @@
       el("netRetry").disabled = true;
       call("apiGetInitData", [], function (data) {
         el("netRetry").disabled = false;
-        cacheInit({ categories: data.categories, currencies: data.currencies, merchants: data.merchants || {}, recent: data.recent, todayKey: data.todayKey });
+        cacheInit({ categories: data.categories, currencies: data.currencies, merchants: data.merchants || {}, recent: data.recent, todayKey: data.todayKey, periodStartDay: data.periodStartDay });
         applyData(data);
         flushOutbox(); // связь есть — отправляем траты, отложенные без связи
         flushCancels(); // и удаляем на сервере то, что удалили, пока оно отправлялось
