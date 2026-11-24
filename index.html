@@ -118,9 +118,13 @@
     .pdates label { flex:1; min-width:0; display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--muted); }
     .pdates input { width:100%; font-size:16px; padding:9px 8px; border:1px solid var(--line); border-radius:10px; background:var(--field); color:var(--text); }
     /* итог: траты и начисления рядом, одинаковым размером */
-    .stat-sum { display:flex; padding:14px 0; }
-    .stat-sum > div { flex:1; min-width:0; padding:0 14px; }
+    .stat-sum { display:flex; flex-wrap:wrap; padding:14px 0 0; }
+    .stat-sum > div { flex:1; min-width:0; padding:0 14px 14px; }
     .stat-sum > div + div { border-left:1px solid var(--line); }
+    .stat-sum > .bal { flex-basis:100%; display:flex; justify-content:space-between; align-items:baseline; border-left:0; border-top:1px solid var(--line); padding-top:12px; }
+    .stat-sum .bal .cap { font-size:15px; color:var(--text); }
+    .stat-sum .val.plus { color:var(--ok); }
+    .stat-sum .val.minus { color:var(--danger); }
     .stat-sum .cap { color:var(--muted); font-size:13px; }
     .stat-sum .val { font-size:22px; font-weight:700; margin-top:3px; white-space:nowrap; }
     .sect { color:var(--muted); font-size:13px; font-weight:600; margin:20px 4px 8px; }
@@ -621,7 +625,11 @@
     }
     function renderStats(res) {
       var html = '<div class="card stat-sum"><div><div class="cap">Траты</div><div class="val">' + esc(fmtEur(res.spent)) + '</div></div>' +
-        '<div><div class="cap">Начисления</div><div class="val">' + esc(fmtEur(res.income)) + '</div></div></div>';
+        '<div><div class="cap">Начисления</div><div class="val">' + esc(fmtEur(res.income)) + '</div></div>';
+      // баланс: зелёный — в плюсе, красный — в минусе
+      var bal = Math.round(((res.income || 0) - (res.spent || 0)) * 100) / 100;
+      html += '<div class="bal"><span class="cap">Баланс</span><span class="val ' + (bal > 0 ? "plus" : bal < 0 ? "minus" : "") + '">' +
+        (bal > 0 ? "+" : bal < 0 ? "−" : "") + esc(fmtEur(Math.abs(bal))) + '</span></div></div>';
       if (!res.count) { el("statsBody").innerHTML = html + '<p class="muted" style="text-align:center">Операций за этот промежуток нет</p>'; return; }
       function block(title, key, cls) {
         var list = (res.categories || []).filter(function (c) { return c[key] > 0; }).sort(function (a, b) { return b[key] - a[key]; });
