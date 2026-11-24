@@ -105,6 +105,7 @@
     /* история: слева «Сегодня» / «Вчера» / день недели, справа дата */
     .day { display:flex; justify-content:space-between; align-items:baseline; gap:10px; color:var(--muted); font-size:13px; font-weight:600; margin:24px 4px 10px; }
     .day .dd { font-weight:400; }
+    .hist-more { display:flex; flex-direction:column; align-items:center; gap:6px; min-height:64px; padding:16px 0 24px; font-size:14px; text-align:center; }
     .diag { position:fixed; inset:12px; z-index:50; overflow:auto; padding:12px; border-radius:14px; background:var(--card); color:var(--text);
       border:1px solid var(--line); box-shadow:0 8px 24px rgba(0,0,0,.3); font:12px/1.45 ui-monospace, Menlo, monospace; white-space:pre-wrap; }
     .day:first-child { margin-top:0; }
@@ -199,6 +200,7 @@
 
     <section id="view-history" class="hidden">
       <div id="historyList"></div>
+      <div id="histMore" class="hist-more"></div>
     </section>
   </div>
 
@@ -268,6 +270,7 @@
     var API = {
       apiGetInitData: function () { return { fn: "init" }; },
       apiGetRecent: function () { return { fn: "recent" }; },
+      apiGetOlder: function (before) { return { fn: "recent", before: before }; },
       apiAddTransaction: function (form) { return { fn: "add", form: form }; },
       apiAddMany: function (forms) { return { fn: "addMany", forms: forms }; },
       apiUpdateTransaction: function (row, expected, form) { return { fn: "update", row: row, expected: expected, form: form }; },
@@ -489,6 +492,7 @@
       el("histBar").classList.toggle("hidden", !h);
       window.scrollTo(0, 0);
       scheduleFit();
+      if (h) setTimeout(checkMore, 0);
     }
 
     // ---------- подгонка под высоту экрана ----------
@@ -656,7 +660,7 @@
       call("apiDeleteById", [id], function (res, full) {
         cancelling = false;
         cancels(cancels().filter(function (x) { return x !== id; }));
-        if (full && full.recent) state.recent = full.recent;
+        if (full && full.recent) state.recent = withOlder(full.recent);
         refreshHistory();
         flushCancels();
       }, function (msg, kind) {
@@ -701,7 +705,7 @@
           return { form: x.form, error: r.error };
         }).filter(Boolean));
         if (errors.length) toast((errors.length === 1 ? "Операция не записалась: " : "Не записались операции: " + errors.length + " — ") + errors[0], true);
-        if (full && full.recent) state.recent = full.recent;
+        if (full && full.recent) state.recent = withOlder(full.recent);
         updateNetBar();
         refreshHistory();
         flushOutbox(); // следующая пачка, если очередь была длиннее SEND_BATCH
@@ -928,8 +932,8 @@
     }
     // сервер присылает свежую историю вместе с ответом; если её нет — запрашиваем отдельно
     function showRecent(full) {
-      if (full && full.recent) renderHistory(full.recent);
-      else call("apiGetRecent", [], renderHistory);
+      if (full && full.recent) renderHistory(withOlder(full.recent));
+      else call("apiGetRecent", [], function (list) { renderHistory(withOlder(list)); });
     }
 
     // ---------- изменение ----------
@@ -1037,6 +1041,70 @@
     // ответов история перечитывается с сервера.
     var pendingDeletes = 0, deleteFailed = false;
     function byDateDesc(a, b) { return (b.sortKey - a.sortKey) || (b.row - a.row); }
+
+    // ---------- подгрузка старых операций при прокрутке истории ----------
+    // state.recent — всё, что показано: первая страница от сервера и подгруженные старые.
+    // Сервер в ответах присылает только первую страницу — старые подгруженные сохраняем (withOlder).
+    var HIST_PAGE = 50;
+    var hist = { loading: false, done: false, failed: false, next: 0 }; // next — с какой строки таблицы грузить дальше
+    function opKey(x) { return x.id || [x.date, x.amount, x.currencyId, x.categoryId].join("|"); }
+    function minRow(list) { return list.reduce(function (m, x) { return Math.min(m, Number(x.row) || Infinity); }, Infinity); }
+    function withOlder(top) {
+      top = top || [];
+      if (!top.length) return top;
+      var min = minRow(top), seen = {};
+      top.forEach(function (x) { seen[opKey(x)] = 1; });
+      var old = (state.recent || []).filter(function (x) { return x.row < min && !seen[opKey(x)]; });
+      return old.length ? top.concat(old).sort(byDateDesc) : top;
+    }
+    function historyVisible() { return !el("view-history").classList.contains("hidden"); }
+    function loadOlder() {
+      if (hist.loading || hist.done || hist.failed || !state.loaded || !historyVisible()) return;
+      if (state.offline || navigator.onLine === false) { renderMore(); return; }
+      var before = Math.min(minRow(state.recent || []), hist.next || Infinity);
+      if (!isFinite(before) || before <= 2) { hist.done = true; renderMore(); return; }
+      hist.loading = true;
+      renderMore();
+      call("apiGetOlder", [before], function (res) {
+        hist.loading = false;
+        res = res || {};
+        hist.next = Number(res.next) || before;
+        hist.done = !res.more;
+        var items = res.items || [];
+        (function apply() {
+          // пока открыт свайп или идёт удаление — подождём, чтобы не сбить строки под пальцем
+          if (!canRedrawHistory() || pendingDeletes > 0) { setTimeout(apply, 400); return; }
+          var have = {};
+          state.recent.forEach(function (x) { have[opKey(x)] = 1; });
+          var add = items.filter(function (x) { return !have[opKey(x)]; });
+          if (add.length) renderHistory(state.recent.concat(add).sort(byDateDesc));
+          else { renderMore(); checkMore(); }
+        })();
+      }, function (msg, kind) {
+        hist.loading = false;
+        if (kind === "network") { renderMore(); return; } // без связи — подгрузим, когда появится
+        hist.failed = true;
+        renderMore();
+      });
+    }
+    function retryOlder() { hist.failed = false; loadOlder(); }
+    // низ списка: индикатор, ошибка с «Повторить» или «Это все операции»
+    function renderMore() {
+      var m = el("histMore");
+      if (!state.loaded || !(state.recent || []).length) { m.innerHTML = ""; return; }
+      if (hist.loading) m.innerHTML = '<span class="spinner sm"></span>';
+      else if (hist.failed) m.innerHTML = '<span class="muted">Старые операции не загрузились</span><button class="link" style="width:auto;margin:0" onclick="retryOlder()">Повторить</button>';
+      else if (hist.done) m.innerHTML = '<span class="muted">Это все операции</span>';
+      else if (state.offline || navigator.onLine === false) m.innerHTML = '<span class="muted">Старые операции загрузятся, когда будет связь</span>';
+      else m.innerHTML = "";
+    }
+    // до конца списка осталось меньше полутора экранов — грузим следующую страницу
+    function checkMore() {
+      if (!historyVisible()) return;
+      if (el("histMore").getBoundingClientRect().top < window.innerHeight * 2.5) loadOlder();
+    }
+    window.addEventListener("scroll", checkMore, { passive: true });
+    window.addEventListener("online", function () { setTimeout(checkMore, 500); });
     function canRedrawHistory() { return !state.editing && !swipe.openRow && !swipe.row; }
     function deleteRow(i) {
       var r = state.recent[i];
@@ -1047,6 +1115,7 @@
       var rest = state.recent.filter(function (x, k) { return k !== i; }).map(function (x) {
         return x.row > r.row ? Object.assign({}, x, { row: x.row - 1 }) : x;
       });
+      if (hist.next > r.row) hist.next--;
       swipe.openRow = null;
       swipe.row = null;
       renderHistory(rest);
@@ -1054,8 +1123,8 @@
         if (pendingDeletes > 0) return;
         if (deleteFailed) {
           deleteFailed = false;
-          call("apiGetRecent", [], function (list) { if (pendingDeletes === 0 && canRedrawHistory()) renderHistory(list); }, function () {});
-        } else if (full && full.recent && canRedrawHistory()) renderHistory(full.recent);
+          call("apiGetRecent", [], function (list) { if (pendingDeletes === 0 && canRedrawHistory()) renderHistory(withOlder(list)); }, function () {});
+        } else if (full && full.recent && canRedrawHistory()) renderHistory(withOlder(full.recent));
       }
       call("apiDeleteTransaction", [r.row, { date: r.date, amount: r.amount, currencyId: r.currencyId }], function (res, full) {
         pendingDeletes--;
@@ -1111,9 +1180,9 @@
     }
     function renderHistory(items) {
       swipe.openRow = null;
-      if (items === null) { el("historyList").innerHTML = queuedHtml() + pendingBlock("pending tall"); return; } // ещё грузится
+      if (items === null) { el("historyList").innerHTML = queuedHtml() + pendingBlock("pending tall"); el("histMore").innerHTML = ""; return; } // ещё грузится
       state.recent = items || [];
-      cacheInit({ recent: state.recent });
+      cacheInit({ recent: state.recent.slice(0, HIST_PAGE) }); // на телефоне храним только первую страницу
       var html = queuedHtml(), lastDay = null;
       var gone = cancels();
       state.recent.forEach(function (r, i) {
@@ -1132,6 +1201,8 @@
           '</div></div>';
       });
       el("historyList").innerHTML = html || '<p class="muted">Пока пусто</p>';
+      renderMore();
+      setTimeout(checkMore, 0);
     }
 
     // ---------- параметры ссылки (после "#") ----------
@@ -1215,6 +1286,7 @@
       renderCurrencies(cur);
       if (!state.categories.some(function (c) { return c.categoryId === state.categoryId; })) state.categoryId = "";
       renderCategories();
+      hist.done = false; hist.next = 0; hist.failed = false;
       if (!state.editing && pendingDeletes === 0 && !swipe.openRow && !swipe.row) renderHistory(data.recent || []);
       applyPrefill();
     }
