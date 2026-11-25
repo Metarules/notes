@@ -64,7 +64,7 @@ button { font-family:inherit; cursor:pointer; }
   background:var(--card); border:1px solid var(--line); border-radius:14px; box-shadow:0 8px 24px rgba(0,0,0,.25); }
 .cur-panel button { display:flex; align-items:center; gap:8px; width:100%; min-height:var(--cur-row-h); padding:6px 14px 6px 12px; border:0; background:transparent; color:var(--text); text-align:left; }
 .cur-panel button + button { border-top:1px solid var(--line); }
-.cur-panel .code { flex:1; font-size:20px; font-weight:600; }
+.cur-panel .code { flex:1; font-size:20px; font-weight:400; }
 .cur-panel .check { flex:0 0 20px; color:var(--text); font-size:18px; font-weight:600; text-align:center; }
 .cur-panel button:active { background:var(--line); }
 /* сетка категорий */
