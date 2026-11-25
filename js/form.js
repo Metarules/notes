@@ -171,10 +171,13 @@ function save() {
   setSaving(true);
   if (state.editing) {
     var ed = state.editing;
+    if (ed.when && ed.when !== ed.when0) form.when = ed.when; // дату меняли — сервер поставит строку на новое место
     call("apiUpdateTransaction", [ed.row, ed.expected, form], function (res, full) {
       setSaving(false);
       toast(res.message);
       cancelEdit();
+      // строка переехала по дате: номера подгруженных старых операций сдвинулись — показываем историю заново с начала
+      if (res && res.moved) { state.recent = []; hist.next = 0; hist.done = false; hist.failed = false; }
       showRecent(full);
     }, function (msg, kind) {
       if (kind === "network") toast(NO_NET_EDIT, false, TOAST_LONG_MS); else toast(msg, true);
@@ -226,10 +229,13 @@ function startEdit(i) {
   if (!r) return;
   state.savedNew = { amount: el("amount").value, sign: state.sign, categoryId: state.categoryId, currencyId: el("currency").value, prefill: state.prefill, touched: state.touched };
   // id — по нему сервер найдёт операцию, даже если строки сдвинулись; категория — для строк без id
-  state.editing = { row: r.row, expected: { date: r.date, amount: r.amount, currencyId: r.currencyId, categoryId: r.categoryId, id: r.id || "" } };
+  // when — дата и время в виде "yyyy-MM-ddTHH:mm" (белградское время, как в таблице); when0 — как было
+  var when0 = r.dayKey ? r.dayKey + "T" + (r.time || "00:00") : "";
+  state.editing = { row: r.row, expected: { date: r.date, amount: r.amount, currencyId: r.currencyId, categoryId: r.categoryId, id: r.id || "" },
+    when0: when0, when: when0, hasTime: !!r.time };
   state.prefill = null;
   fillForm({ amount: r.amount, currencyId: r.currencyId, categoryId: r.categoryId });
-  el("editDate").textContent = "· " + (r.dateLabel || "");
+  renderEditWhen();
   el("histBar").classList.add("hidden");
   el("navRow").classList.add("hidden"); // при изменении — только «Сохранить»; назад — стрелкой в шапке
   el("editBar").classList.remove("hidden");
@@ -238,6 +244,35 @@ function startEdit(i) {
   window.scrollTo(0, 0);
   scheduleFit();
 }
+// Дата и время операции в шапке изменения. Подпись — «25 ноя, 12:00» (год — если не текущий);
+// у строк, введённых в таблицу только с датой, время не показываем, пока его не выбрали.
+function whenLabel(v, withTime) {
+  var p = String(v).split("T"), d = p[0].split("-").map(Number);
+  var s = d[2] + " " + MON_GEN[d[1] - 1] + (d[0] !== new Date().getFullYear() ? " " + d[0] : "");
+  return withTime ? s + ", " + p[1] : s;
+}
+function renderEditWhen() {
+  var e = state.editing;
+  el("editWhenPill").classList.toggle("hidden", !e || !e.when); // у строки без даты (текст в ячейке) менять нечего
+  if (!e || !e.when) return;
+  var changed = e.when !== e.when0;
+  el("editWhen").textContent = whenLabel(e.when, e.hasTime || changed);
+  el("editWhenPill").classList.toggle("changed", changed);
+  el("editWhenInput").value = e.when;
+}
+el("editWhenInput").addEventListener("change", function () {
+  var e = state.editing;
+  if (!e) return;
+  var v = el("editWhenInput").value;
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(v)) e.when = v.slice(0, 16); // «Очистить» в системном окне — оставляем прежнее
+  renderEditWhen();
+  formChanged(true);
+});
+// на компьютере прозрачное поле само открывает выбор только со значка — открываем сразу; на iPhone окно открывается по нажатию
+el("editWhenInput").addEventListener("click", function () {
+  try { if (window.matchMedia && matchMedia("(pointer: fine)").matches && this.showPicker) this.showPicker(); } catch (x) {}
+});
+
 function cancelEdit() {
   state.editing = null;
   el("editBar").classList.add("hidden");

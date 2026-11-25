@@ -20,8 +20,8 @@
   <link rel="icon" href="icons/icon-192.png">
   <title>Бюджет</title>
   <!-- тема — до отрисовки страницы, чтобы не мигала светлая; отдельным файлом: встроенные скрипты запрещены (CSP) -->
-  <script src="js/theme-init.js?v=40"></script>
-  <link rel="stylesheet" href="style.css?v=40">
+  <script src="js/theme-init.js?v=41"></script>
+  <link rel="stylesheet" href="style.css?v=41">
 </head>
 <body>
   <div id="loader" class="loader">
@@ -45,7 +45,9 @@
     </div>
     <div id="editBar" class="editbar hidden">
       <button class="back" data-act="cancelEdit" aria-label="Назад">←</button>
-      <span class="title">Изменение операции <span id="editDate" class="date"></span></span>
+      <span class="title">Изменение</span>
+      <!-- дата и время операции: «таблетка» — по нажатию системный выбор даты и времени (прозрачное поле поверх) -->
+      <label id="editWhenPill" class="when-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M16 3v4M8 3v4M4 11h16"/></svg><span id="editWhen"></span><input type="datetime-local" id="editWhenInput" class="when-input" aria-label="Дата и время операции"></label>
     </div>
 
     <section id="view-add">
@@ -119,16 +121,16 @@
 
   <!-- скрипты страницы: обычные (не модули), по порядку — app.js с запуском последним.
        ?v= — номер релиза страницы: после обновления телефон не возьмёт старый файл из кэша -->
-  <script src="js/core.js?v=40"></script>
-  <script src="js/api.js?v=40"></script>
-  <script src="js/sms.js?v=40"></script>
-  <script src="js/theme.js?v=40"></script>
-  <script src="js/stats.js?v=40"></script>
-  <script src="js/layout.js?v=40"></script>
-  <script src="js/queue.js?v=40"></script>
-  <script src="js/form.js?v=40"></script>
-  <script src="js/history.js?v=40"></script>
-  <script src="js/actions.js?v=40"></script>
-  <script src="js/app.js?v=40"></script>
+  <script src="js/core.js?v=41"></script>
+  <script src="js/api.js?v=41"></script>
+  <script src="js/sms.js?v=41"></script>
+  <script src="js/theme.js?v=41"></script>
+  <script src="js/stats.js?v=41"></script>
+  <script src="js/layout.js?v=41"></script>
+  <script src="js/queue.js?v=41"></script>
+  <script src="js/form.js?v=41"></script>
+  <script src="js/history.js?v=41"></script>
+  <script src="js/actions.js?v=41"></script>
+  <script src="js/app.js?v=41"></script>
 </body>
 </html>
