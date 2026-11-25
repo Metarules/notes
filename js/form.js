@@ -163,6 +163,7 @@ function readForm() {
 // изменить или удалить уже записанную операцию можно только со связью (очередь — только для новых)
 var NO_NET_EDIT = "Нет связи — изменить можно, когда появится связь";
 var NO_NET_DELETE = "Нет связи — удалить можно, когда появится связь";
+var NO_NET_EDIT_LOST = "Связь пропала — изменение не сохранилось";
 
 function save() {
   var form = readForm();
@@ -172,16 +173,28 @@ function save() {
   if (state.editing) {
     var ed = state.editing;
     if (ed.when && ed.when !== ed.when0) form.when = ed.when; // дату меняли — сервер поставит строку на новое место
+    // Как на главной форме: сразу возвращаемся в историю, операция там уже с новыми данными (приглушённо, пока сервер
+    // не ответит), запрос уходит фоном и доходит, даже если форму сразу закрыть. Не получилось — операция
+    // возвращается к прежнему виду и показываем причину.
+    setSaving(false);
+    cancelEdit();
+    var old = showEditLocally(ed, form);
+    pendingEdits++;
+    toast("Сохранено: " + fmtNum(form.amount) + " " + form.currencyId + " · " + (categoryName(form.categoryId) || form.categoryId), false, TOAST_SHORT_MS);
     call("apiUpdateTransaction", [ed.row, ed.expected, form], function (res, full) {
-      setSaving(false);
-      toast(res.message);
-      cancelEdit();
-      // строка переехала по дате: номера подгруженных старых операций сдвинулись — показываем историю заново с начала
-      if (res && res.moved) { state.recent = []; hist.next = 0; hist.done = false; hist.failed = false; }
-      showRecent(full);
+      pendingEdits--;
+      if (full && full.recent) freshRecent = full.recent;
+      var moved = !!(res && res.moved);
+      redrawWhenFree(function () {
+        // строка переехала по дате: номера подгруженных старых операций сдвинулись — показываем историю заново с начала
+        if (moved) { state.recent = []; hist.next = 0; hist.done = false; hist.failed = false; }
+        if (freshRecent) renderHistory(withOlder(freshRecent)); else showRecent(null);
+      });
     }, function (msg, kind) {
-      if (kind === "network") toast(NO_NET_EDIT, false, TOAST_LONG_MS); else toast(msg, true);
-    });
+      pendingEdits--;
+      undoEditLocally(old);
+      if (kind === "network") toast(NO_NET_EDIT_LOST, true); else toast("Изменение не сохранилось: " + msg, true);
+    }, { keepalive: true });
     return;
   }
   var p = state.prefill || {};
@@ -272,6 +285,37 @@ el("editWhenInput").addEventListener("change", function () {
 el("editWhenInput").addEventListener("click", function () {
   try { if (window.matchMedia && matchMedia("(pointer: fine)").matches && this.showPicker) this.showPicker(); } catch (x) {}
 });
+
+// операция в истории до ответа сервера: новые сумма, валюта, категория и дата, отметка pending (приглушена)
+function sameOp(a, b) { return a.id ? a.id === b.id : a.row === b.row; }
+function showEditLocally(ed, form) {
+  var key = { id: ed.expected.id, row: ed.row };
+  var i = -1;
+  state.recent.forEach(function (x, k) { if (i < 0 && sameOp(key, x)) i = k; });
+  if (i < 0) return null;
+  var old = state.recent[i];
+  var r = Object.assign({}, old, { amount: form.amount, currencyId: form.currencyId, categoryId: form.categoryId,
+    categoryName: categoryName(form.categoryId) || old.categoryName, pending: true });
+  // сумма в евро: та же валюта — пересчитываем по прежнему курсу, другая — покажет сервер
+  r.amountEUR = form.currencyId === old.currencyId && typeof old.amountEUR === "number" && Number(old.amount)
+    ? Math.round(old.amountEUR / Number(old.amount) * form.amount * 100) / 100 : "";
+  if (form.when) {
+    var hm = form.when.slice(11, 16);
+    r.dayKey = form.when.slice(0, 10);
+    r.time = hm === "00:00" ? "" : hm;
+    r.sortKey = new Date(form.when).getTime();
+  }
+  var list = state.recent.slice();
+  list[i] = r;
+  if (canRedrawHistory()) renderHistory(list.sort(byDateDesc)); else state.recent = list.sort(byDateDesc);
+  return old;
+}
+// сервер не сохранил изменение — возвращаем операцию к прежнему виду
+function undoEditLocally(old) {
+  if (!old) return;
+  var list = state.recent.map(function (x) { return sameOp(old, x) ? old : x; }).sort(byDateDesc);
+  if (canRedrawHistory()) renderHistory(list); else state.recent = list;
+}
 
 function cancelEdit() {
   state.editing = null;

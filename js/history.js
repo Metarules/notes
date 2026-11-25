@@ -74,6 +74,17 @@ list.addEventListener("click", function (e) {
 // ещё не удалённые карточки). Если какое-то удаление не прошло, карточка возвращается, а после всех
 // ответов история перечитывается с сервера.
 var pendingDeletes = 0, deleteFailed = false;
+// Изменения тоже уходят фоном (form.js). Пока ждём ответов на удаления или изменения, свежую историю с сервера
+// не рисуем — иначе вернулись бы карточки в прежнем виде; рисуем последний пришедший ответ, когда ждать нечего.
+var pendingEdits = 0, freshRecent = null;
+function historyBusy() { return pendingDeletes > 0 || pendingEdits > 0; }
+// перерисовать историю, когда ничего не ждём и пользователь с ней не работает (свайп, изменение)
+function redrawWhenFree(fn) {
+  (function tryIt() {
+    if (historyBusy() || !canRedrawHistory()) { setTimeout(tryIt, HIST_REDRAW_RETRY_MS); return; }
+    fn();
+  })();
+}
 function byDateDesc(a, b) { return (b.sortKey - a.sortKey) || (b.row - a.row); }
 
 // ---------- подгрузка старых операций при прокрутке истории ----------
@@ -118,7 +129,7 @@ function loadOlder() {
     var items = res.items || [];
     (function apply() {
       // пока открыт свайп или идёт удаление — подождём, чтобы не сбить строки под пальцем
-      if (!canRedrawHistory() || pendingDeletes > 0) { setTimeout(apply, HIST_REDRAW_RETRY_MS); return; }
+      if (!canRedrawHistory() || historyBusy()) { setTimeout(apply, HIST_REDRAW_RETRY_MS); return; }
       var have = {};
       state.recent.forEach(function (x) { have[opKey(x)] = 1; });
       var add = items.filter(function (x) { return !have[opKey(x)]; });
@@ -165,11 +176,12 @@ function deleteRow(i) {
   swipe.row = null;
   renderHistory(rest);
   function allDone(full) {
-    if (pendingDeletes > 0) return;
+    if (full && full.recent) freshRecent = full.recent;
+    if (historyBusy()) return;
     if (deleteFailed) {
       deleteFailed = false;
-      call("apiGetRecent", [], function (list) { if (pendingDeletes === 0 && canRedrawHistory()) renderHistory(withOlder(list)); }, function () {});
-    } else if (full && full.recent && canRedrawHistory()) renderHistory(withOlder(full.recent));
+      call("apiGetRecent", [], function (list) { if (!historyBusy() && canRedrawHistory()) renderHistory(withOlder(list)); }, function () {});
+    } else if (freshRecent && canRedrawHistory()) renderHistory(withOlder(freshRecent));
   }
   call("apiDeleteTransaction", [r.row, { date: r.date, amount: r.amount, currencyId: r.currencyId, categoryId: r.categoryId, id: r.id || "" }], function (res, full) {
     pendingDeletes--;
@@ -235,7 +247,8 @@ function renderHistory(items) {
     if (r.dayKey !== lastDay) { html += dayHead(r.dayKey); lastDay = r.dayKey; }
     var n = Number(r.amount);
     var name = r.categoryName || categoryName(r.categoryId) || "Без категории";
-    html += '<div class="row" data-i="' + i + '">' +
+    // pending — изменение ещё не подтверждено сервером: карточка приглушена и не нажимается
+    html += '<div class="row' + (r.pending ? " busy" : "") + '" data-i="' + i + '">' +
       '<button class="swipe-del" aria-label="Удалить">Удалить</button>' +
       '<div class="card tx">' +
       '<div class="tx-main">' +

@@ -83,7 +83,7 @@ function applyData(data) {
   if (!state.categories.some(function (c) { return c.categoryId === state.categoryId; })) state.categoryId = "";
   renderCategories();
   hist.done = false; hist.next = 0; hist.failed = false;
-  if (!state.editing && pendingDeletes === 0 && !swipe.openRow && !swipe.row) renderHistory(data.recent || []);
+  if (!state.editing && !historyBusy() && !swipe.openRow && !swipe.row) renderHistory(data.recent || []);
   applyPrefill();
 }
 

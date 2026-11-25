@@ -81,7 +81,7 @@ function flushCancels() {
 }
 // перерисовать историю, если пользователь сейчас с ней не работает
 function refreshHistory() {
-  if (!state.editing && pendingDeletes === 0 && !swipe.openRow && !swipe.row) renderHistory(state.loaded ? state.recent : null);
+  if (!state.editing && !historyBusy() && !swipe.openRow && !swipe.row) renderHistory(state.loaded ? state.recent : null);
 }
 // Очередь уходит одним запросом (addMany, до SEND_BATCH операций): сервер пишет их подряд и отвечает по каждой.
 // sendingIds — операции, которые прямо сейчас уходят на сервер (для статуса «отправляется…»)
