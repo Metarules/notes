@@ -359,7 +359,7 @@
         setSaving(false);
       }
       var api = store("api"), token = store("token");
-      if (!isApiUrl(api) || !token) { noAccess("Откройте форму через шорткат «Бюджет»"); return; }
+      if (!isApiUrl(api) || !token) { noAccess(MSG_OPEN_VIA_SHORTCUT); return; }
       var body = API[fn].apply(null, args || []);
       body.action = "page";
       body.token = token;
@@ -384,7 +384,7 @@
           if (res && res.auth === false) {
             store("token", null); // ключ не подошёл — забываем его и кэш данных
             store("init", null);
-            noAccess("Нет доступа. Откройте форму через шорткат «Бюджет»");
+            noAccess("Нет доступа. " + MSG_OPEN_VIA_SHORTCUT);
             return;
           }
           fail((res && res.error) || "Ошибка сервера");
@@ -407,6 +407,11 @@
     function formChanged(byUser) {
       if (byUser) state.touched = true;
     }
+
+    // тексты, которые встречаются в нескольких местах
+    var MSG_OPEN_VIA_SHORTCUT = "Откройте форму через шорткат «Бюджет»";
+    var MSG_DICT_LOADING = "Справочники ещё загружаются — попробуйте через пару секунд";
+    var MSG_STATS_WAIT_NET = "Статистика загрузится, когда будет связь";
 
     function noAccess(text) {
       el("app").classList.add("hidden");
@@ -626,7 +631,7 @@
       var cached = stats.cache[key], seq = ++stats.seq;
       if (cached) renderStats(cached); else el("statsBody").innerHTML = '<div class="pending tall"><span class="spinner sm"></span></div>';
       if (navigator.onLine === false || state.offline) {
-        if (!cached) el("statsBody").innerHTML = '<div class="pending tall"><span class="muted">Статистика загрузится, когда будет связь</span></div>';
+        if (!cached) el("statsBody").innerHTML = '<div class="pending tall"><span class="muted">' + esc(MSG_STATS_WAIT_NET) + '</span></div>';
         return;
       }
       // всегда берём свежие цифры: показываем сохранённые сразу, обновляем, когда придёт ответ
@@ -635,7 +640,7 @@
         if (seq === stats.seq) renderStats(res);
       }, function (msg, kind) {
         if (seq !== stats.seq || cached) return;
-        el("statsBody").innerHTML = '<div class="pending tall"><span class="muted">' + esc(kind === "network" ? "Статистика загрузится, когда будет связь" : "Не загрузилось: " + msg) +
+        el("statsBody").innerHTML = '<div class="pending tall"><span class="muted">' + esc(kind === "network" ? MSG_STATS_WAIT_NET : "Не загрузилось: " + msg) +
           '</span><button class="link" style="width:auto;margin:0" onclick="loadStats()">Повторить</button></div>';
       });
     }
@@ -1046,7 +1051,7 @@
       if (/^\s*[-+]?[\d\s.,]+\s*$/.test(text)) return; // обычное число — вставляем как есть
       e.preventDefault();
       var r = parseBankText(text);
-      if (!r) { toast(state.loaded ? "В тексте нет суммы с валютой — введите вручную" : "Справочники ещё загружаются — попробуйте через пару секунд", false, TOAST_LONG_MS); return; }
+      if (!r) { toast(state.loaded ? "В тексте нет суммы с валютой — введите вручную" : MSG_DICT_LOADING, false, TOAST_LONG_MS); return; }
       fillForm({ amount: r.amount, currencyId: r.currencyId, categoryId: merchantCategory(r.merchant) });
       state.prefill = { merchant: r.merchant || "", fromClip: true }; // вставили из буфера — после сохранения очистим его
       state.touched = true;
@@ -1055,7 +1060,7 @@
     function readForm() {
       var amount = amountValue();
       if (!amount) { toast("Введите сумму", true); el("amount").focus(); return null; }
-      if (!state.loaded) { toast("Справочники ещё загружаются — подождите пару секунд", true); return null; }
+      if (!state.loaded) { toast(MSG_DICT_LOADING, true); return null; }
       if (!state.categoryId) { toast("Выберите категорию", true); return null; }
       return { amount: state.sign * Math.abs(amount), currencyId: el("currency").value, categoryId: state.categoryId };
     }
@@ -1517,7 +1522,7 @@
 
     // форма показывается сразу; чего ещё нет — крутится индикатор, пока данные грузятся фоном
     function boot() {
-      if (!hasAccess()) { noAccess("Откройте форму через шорткат «Бюджет»"); return; }
+      if (!hasAccess()) { noAccess(MSG_OPEN_VIA_SHORTCUT); return; }
       el("loader").classList.add("hidden");
       el("app").classList.remove("hidden");
       setSign(-1);
