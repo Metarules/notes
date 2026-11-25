@@ -1,0 +1,254 @@
+// Форма ввода: знак, категории, выбор валюты, сохранение, изменение операции.
+
+// ---------- знак ----------
+function setSign(s) {
+  state.sign = s;
+  el("signBtn").textContent = s < 0 ? "−" : "+";
+  el("amountField").classList.toggle("pos", s > 0);
+}
+function toggleSign() { setSign(-state.sign); formChanged(true); }
+
+// ---------- индикаторы загрузки ----------
+// пока справочников нет: в сетке категорий — индикатор или ошибка с кнопкой «Повторить»
+function pendingBlock(cls) {
+  // нет связи — о ней уже говорит плашка сверху, здесь только тихая пометка
+  if (state.offline) return '<div class="' + cls + '"><span class="muted">Загрузится, когда будет связь</span></div>';
+  if (state.loadError) return '<div class="' + cls + '"><span class="muted">' + esc(state.loadError) + '</span><button class="link" style="width:auto;margin:0" onclick="load()">Повторить</button></div>';
+  return '<div class="' + cls + '"><span class="spinner sm"></span></div>';
+}
+
+// ---------- категории ----------
+function splitName(name) {
+  var m = String(name || "").match(/^(\S+)\s+(.+)$/);
+  if (m && !/[A-Za-zА-Яа-яЁё0-9]/.test(m[1])) return { emo: m[1], label: m[2] };
+  return { emo: "", label: String(name || "") };
+}
+function renderCategories() {
+  if (!state.loaded) { el("catGrid").innerHTML = pendingBlock("pending"); updateSaveBtn(); return; }
+  el("catGrid").innerHTML = state.categories.map(function (c, i) {
+    var n = splitName(c.categoryName);
+    return '<button class="chip' + (c.categoryId === state.categoryId ? " on" : "") + '" onclick="userPickCategory(' + i + ')">' +
+      (n.emo ? '<span class="emo">' + esc(n.emo) + '</span>' : '') +
+      '<span class="name">' + esc(n.label) + '</span></button>';
+  }).join("");
+  updateSaveBtn();
+  scheduleFit();
+}
+function pickCategory(id) { state.categoryId = id; renderCategories(); }
+function userPickCategory(i) { var c = state.categories[i]; if (!c) return; pickCategory(c.categoryId); formChanged(true); }
+function categoryName(id) {
+  var c = state.categories.filter(function (x) { return x.categoryId === id; })[0];
+  return c ? c.categoryName : "";
+}
+// список валют; пока его нет — «…» и выбор недоступен
+function renderCurrencies(selected) {
+  var sel = el("currency");
+  if (!state.currencies.length) { sel.innerHTML = '<option value="">…</option>'; sel.disabled = true; sel.classList.add("loading"); syncCurBtn(); return; }
+  if (state.currencies.indexOf(selected) < 0) selected = state.currencies.indexOf("RSD") > -1 ? "RSD" : state.currencies[0];
+  sel.innerHTML = state.currencies.map(function (c) {
+    return '<option value="' + esc(c) + '"' + (c === selected ? " selected" : "") + ">" + esc(c) + "</option>";
+  }).join("");
+  sel.disabled = false;
+  sel.classList.remove("loading");
+  syncCurBtn();
+}
+
+// ---------- выбор валюты: крупная панель вместо системного списка ----------
+// Значение хранится в скрытом <select id="currency"> — остальной код читает его как раньше.
+function syncCurBtn() {
+  var sel = el("currency"), b = el("curBtn");
+  b.innerHTML = sel.disabled || !sel.value ? "…" : esc(sel.value) + '<svg class="caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
+  b.disabled = sel.disabled;
+}
+function setCurrency(c) {
+  if (state.currencies.indexOf(c) > -1) el("currency").value = c;
+  syncCurBtn();
+}
+// список валют не ниже CUR_PANEL_MIN_ROWS строк, даже на низком экране; CUR_PANEL_PAD — отступы панели сверху и снизу (padding в CSS)
+var CUR_PANEL_MIN_ROWS = 4, CUR_PANEL_PAD = 8;
+function toggleCurPanel() {
+  if (!el("curPanel").classList.contains("hidden")) { closeCurPanel(); return; }
+  var f = el("amountField"), p = el("curPanel"), cur = el("currency").value;
+  p.style.top = (f.offsetTop + f.offsetHeight + 6) + "px";
+  // не длиннее видимой части экрана над панелью браузера: если валют много — список прокручивается
+  var room = window.innerHeight - fitReserve() - (f.getBoundingClientRect().bottom + 6) - 8;
+  p.style.maxHeight = Math.max(CUR_PANEL_MIN_ROWS * cssNum("--cur-row-h", 52) + CUR_PANEL_PAD, room) + "px";
+  p.innerHTML = state.currencies.map(function (c, i) {
+    var on = c === cur;
+    return '<button role="menuitemradio" aria-checked="' + on + '" class="' + (on ? "on" : "") + '" onclick="pickCurrency(' + i + ')">' +
+      '<span class="check" aria-hidden="true">' + (on ? "✓" : "") + '</span>' +
+      '<span class="code">' + esc(c) + '</span></button>';
+  }).join("");
+  p.classList.remove("hidden");
+  el("curBtn").setAttribute("aria-expanded", "true");
+}
+function closeCurPanel() {
+  el("curPanel").classList.add("hidden");
+  el("curBtn").setAttribute("aria-expanded", "false");
+}
+function pickCurrency(i) {
+  var c = state.currencies[i];
+  closeCurPanel();
+  if (!c || c === el("currency").value) return;
+  setCurrency(c);
+  el("currency").dispatchEvent(new Event("change")); // как выбор в системном списке: «пользователь поменял форму»
+}
+// касание вне панели и кнопки валюты — закрыть
+document.addEventListener("pointerdown", function (e) {
+  if (el("curPanel").classList.contains("hidden")) return;
+  if (e.target.closest("#curPanel") || e.target.closest("#curBtn")) return;
+  closeCurPanel();
+}, true);
+document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeCurPanel(); });
+
+// ---------- форма ----------
+function fillForm(d) {
+  formChanged();
+  setSign(Number(d.amount) > 0 ? 1 : -1);
+  el("amount").value = Math.abs(Number(d.amount)) || "";
+  updateClear();
+  if (d.currencyId) state.wantCurrency = d.currencyId; // если валют ещё нет — выберем, когда загрузятся
+  if (state.currencies.indexOf(d.currencyId) > -1) setCurrency(d.currencyId);
+  pickCategory(d.categoryId || "");
+}
+function resetForm() {
+  setSign(-1);
+  el("amount").value = "";
+  updateClear();
+  pickCategory("");
+  state.prefill = null;
+  state.wantCurrency = "";
+  formChanged();
+  state.touched = false;
+}
+// убрать данные траты из адресной строки и из вкладки, чтобы обновление страницы не подставило их снова
+function clearUrl() {
+  try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {}
+  state.smsText = "";
+  session("sms", null);
+}
+
+// крестик в поле суммы: стирает только сумму
+function updateClear() { el("clearAmt").classList.toggle("hidden", !el("amount").value); updateSaveBtn(); }
+function clearAmount() {
+  el("amount").value = "";
+  updateClear();
+  formChanged(true);
+  el("amount").focus();
+}
+el("amount").addEventListener("input", function () { updateClear(); formChanged(true); });
+el("currency").addEventListener("change", function () { state.wantCurrency = ""; formChanged(true); });
+
+// вставка текста банка в поле суммы — разбираем прямо на странице и заполняем форму
+el("amount").addEventListener("paste", function (e) {
+  if (state.editing) return;
+  var text = (e.clipboardData || window.clipboardData).getData("text") || "";
+  if (/^\s*[-+]?[\d\s.,]+\s*$/.test(text)) return; // обычное число — вставляем как есть
+  e.preventDefault();
+  var r = parseBankText(text);
+  if (!r) { toast(state.loaded ? "В тексте нет суммы с валютой — введите вручную" : MSG_DICT_LOADING, false, TOAST_LONG_MS); return; }
+  fillForm({ amount: r.amount, currencyId: r.currencyId, categoryId: merchantCategory(r.merchant) });
+  state.prefill = { merchant: r.merchant || "", fromClip: true }; // вставили из буфера — после сохранения очистим его
+  state.touched = true;
+});
+
+function readForm() {
+  var amount = amountValue();
+  if (!amount) { toast("Введите сумму", true); el("amount").focus(); return null; }
+  if (!state.loaded) { toast(MSG_DICT_LOADING, true); return null; }
+  if (!state.categoryId) { toast("Выберите категорию", true); return null; }
+  return { amount: state.sign * Math.abs(amount), currencyId: el("currency").value, categoryId: state.categoryId };
+}
+
+// изменить или удалить уже записанную операцию можно только со связью (очередь — только для новых)
+var NO_NET_EDIT = "Нет связи — изменить можно, когда появится связь";
+var NO_NET_DELETE = "Нет связи — удалить можно, когда появится связь";
+
+function save() {
+  var form = readForm();
+  if (!form) return;
+  if (state.editing && navigator.onLine === false) { toast(NO_NET_EDIT, false, TOAST_LONG_MS); return; }
+  setSaving(true);
+  if (state.editing) {
+    var ed = state.editing;
+    call("apiUpdateTransaction", [ed.row, ed.expected, form], function (res, full) {
+      setSaving(false);
+      toast(res.message);
+      cancelEdit();
+      showRecent(full);
+    }, function (msg, kind) {
+      if (kind === "network") toast(NO_NET_EDIT, false, TOAST_LONG_MS); else toast(msg, true);
+    });
+    return;
+  }
+  var p = state.prefill || {};
+  form.merchant = p.merchant || "";
+  // текст банка был взят из буфера обмена — чистим буфер, чтобы следующий запуск не подставил ту же операцию.
+  // Делаем сразу, пока идёт нажатие на кнопку: позже браузер запись в буфер не разрешит.
+  if (p.fromClip) clearClipboard();
+  // Мгновенное сохранение: операция сразу ложится в очередь на телефоне, форма очищается,
+  // а отправка идёт в фоне. id — защита от дублей (сервер помнит его в столбце «ID»),
+  // время — момент нажатия «Сохранить»: так операция из очереди получит время покупки.
+  form.id = newId();
+  form.at = new Date().toISOString();
+  var offline = navigator.onLine === false;
+  enqueue(form, offline);
+  store("currency", form.currencyId);
+  resetForm();
+  clearUrl();
+  setSaving(false);
+  toast(offline ? "Нет связи — сохранено на телефоне, отправится позже"
+    : "Сохранено: " + fmtNum(form.amount) + " " + form.currencyId + " · " + (categoryName(form.categoryId) || form.categoryId), false, offline ? TOAST_LONG_MS : TOAST_SHORT_MS);
+  flushOutbox(true); // пробуем сразу, даже если плашка «Нет связи» ещё висит — связь могла вернуться
+}
+function clearClipboard() {
+  function fallback() {
+    try {
+      var t = document.createElement("textarea");
+      t.value = " "; t.setAttribute("readonly", ""); t.style.cssText = "position:fixed;top:-100px;opacity:0";
+      document.body.appendChild(t); t.select(); document.execCommand("copy"); t.remove();
+    } catch (e) {}
+  }
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText("").catch(fallback); return; }
+  } catch (e) {}
+  fallback();
+}
+// сервер присылает свежую историю вместе с ответом; если её нет — запрашиваем отдельно
+function showRecent(full) {
+  if (full && full.recent) renderHistory(withOlder(full.recent));
+  else call("apiGetRecent", [], function (list) { renderHistory(withOlder(list)); });
+}
+
+// ---------- изменение ----------
+function startEdit(i) {
+  var r = state.recent[i];
+  if (!r) return;
+  state.savedNew = { amount: el("amount").value, sign: state.sign, categoryId: state.categoryId, currencyId: el("currency").value, prefill: state.prefill, touched: state.touched };
+  // id — по нему сервер найдёт операцию, даже если строки сдвинулись; категория — для строк без id
+  state.editing = { row: r.row, expected: { date: r.date, amount: r.amount, currencyId: r.currencyId, categoryId: r.categoryId, id: r.id || "" } };
+  state.prefill = null;
+  fillForm({ amount: r.amount, currencyId: r.currencyId, categoryId: r.categoryId });
+  el("editDate").textContent = "· " + (r.dateLabel || "");
+  el("histBar").classList.add("hidden");
+  el("navRow").classList.add("hidden"); // при изменении — только «Сохранить»; назад — стрелкой в шапке
+  el("editBar").classList.remove("hidden");
+  el("view-history").classList.add("hidden");
+  el("view-add").classList.remove("hidden");
+  window.scrollTo(0, 0);
+  scheduleFit();
+}
+function cancelEdit() {
+  state.editing = null;
+  el("editBar").classList.add("hidden");
+  el("navRow").classList.remove("hidden");
+  // возвращаем то, что было на «Вводе» до изменения
+  var s = state.savedNew;
+  if (s) {
+    setSign(s.sign); el("amount").value = s.amount; updateClear(); setCurrency(s.currencyId); pickCategory(s.categoryId);
+    state.prefill = s.prefill;
+    state.touched = s.touched;
+    state.savedNew = null;
+  } else resetForm();
+  showTab("history");
+}
