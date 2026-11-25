@@ -317,9 +317,9 @@
     }
     // «Сохранить» доступна, только когда есть сумма, выбрана категория и загружены справочники
     function amountValue() {
-      var raw = el("amount").value.trim().replace(/\s/g, "").replace(",", ".").replace(/^[-+]/, "");
-      var n = Number(raw);
-      return raw && isFinite(n) && n !== 0 ? Math.abs(n) : 0;
+      var raw = el("amount").value.trim().replace(/^[-+]/, "");
+      var n = raw ? parseNumber(raw) : NaN; // "1 234,50", "1,234.56" и т.п. — так же, как в разборе СМС
+      return isFinite(n) && n !== 0 ? Math.abs(n) : 0;
     }
     function formReady() { return state.loaded && !!state.categoryId && amountValue() > 0; }
     function updateSaveBtn() { el("saveBtn").disabled = saving || !formReady(); }
@@ -408,7 +408,7 @@
     }
 
     // ---------- разбор СМС / уведомления банка ----------
-    // Те же правила, что и на сервере (parseBankText_ в Code.gs): при изменении — менять в обоих местах.
+    // Разбор только здесь, на странице: сервер получает готовые сумму, валюту и магазин.
 
     // число из строки: "1 234,50", "1.234,50", "1,234.50", "-350" и т.п.
     function parseNumber(raw) {
@@ -866,11 +866,13 @@
         outbox(outbox().map(function (x) {
           var r = byId[x.form.id];
           if (!r) return x;                         // не была в этой пачке — останется в очереди
-          if (r.ok) { if (x.off) flushedCount++; return null; } // записана — убираем из очереди
+          if (r.ok) { if (x.off && !r.cancelled) flushedCount++; return null; } // записана (или отменена удалением) — убираем из очереди
           errors.push(r.error);                       // сервер отказал (например, категорию удалили) — повтор не поможет
           return { form: x.form, error: r.error };
         }).filter(Boolean));
         if (errors.length) toast((errors.length === 1 ? "Операция не записалась: " : "Не записались операции: " + errors.length + " — ") + errors[0], true);
+        // сервер ставит операцию на место по дате: строки ниже сдвигаются — поправляем номера у подгруженных старых
+        ((res && res.results) || []).forEach(function (r) { if (r.ok && r.inserted) shiftRows(r.row); });
         if (full && full.recent) state.recent = withOlder(full.recent);
         updateNetBar();
         refreshHistory();
@@ -1034,9 +1036,8 @@
     });
 
     function readForm() {
-      var raw = el("amount").value.trim().replace(/\s/g, "").replace(",", ".").replace(/^[-+]/, "");
-      var amount = Number(raw);
-      if (!raw || !isFinite(amount) || amount === 0) { toast("Введите сумму", true); el("amount").focus(); return null; }
+      var amount = amountValue();
+      if (!amount) { toast("Введите сумму", true); el("amount").focus(); return null; }
       if (!state.loaded) { toast("Справочники ещё загружаются — подождите пару секунд", true); return null; }
       if (!state.categoryId) { toast("Выберите категорию", true); return null; }
       return { amount: state.sign * Math.abs(amount), currencyId: el("currency").value, categoryId: state.categoryId };
@@ -1107,7 +1108,8 @@
       var r = state.recent[i];
       if (!r) return;
       state.savedNew = { amount: el("amount").value, sign: state.sign, categoryId: state.categoryId, currencyId: el("currency").value, prefill: state.prefill, touched: state.touched };
-      state.editing = { row: r.row, expected: { date: r.date, amount: r.amount, currencyId: r.currencyId } };
+      // id — по нему сервер найдёт операцию, даже если строки сдвинулись; категория — для строк без id
+      state.editing = { row: r.row, expected: { date: r.date, amount: r.amount, currencyId: r.currencyId, categoryId: r.categoryId, id: r.id || "" } };
       state.prefill = null;
       fillForm({ amount: r.amount, currencyId: r.currencyId, categoryId: r.categoryId });
       el("editDate").textContent = "· " + (r.dateLabel || "");
@@ -1215,6 +1217,13 @@
     var hist = { loading: false, done: false, failed: false, next: 0 }; // next — с какой строки таблицы грузить дальше
     function opKey(x) { return x.id || [x.date, x.amount, x.currencyId, x.categoryId].join("|"); }
     function minRow(list) { return list.reduce(function (m, x) { return Math.min(m, Number(x.row) || Infinity); }, Infinity); }
+    // сервер вставил строку row (операция встала на место по дате): у строк ниже номера выросли на один
+    function shiftRows(row) {
+      row = Number(row);
+      if (!(row > 1)) return;
+      state.recent = (state.recent || []).map(function (x) { return x.row >= row ? Object.assign({}, x, { row: x.row + 1 }) : x; });
+      if (hist.next && row <= hist.next) hist.next++;
+    }
     function withOlder(top) {
       top = top || [];
       if (!top.length) return top;
@@ -1292,7 +1301,7 @@
           call("apiGetRecent", [], function (list) { if (pendingDeletes === 0 && canRedrawHistory()) renderHistory(withOlder(list)); }, function () {});
         } else if (full && full.recent && canRedrawHistory()) renderHistory(withOlder(full.recent));
       }
-      call("apiDeleteTransaction", [r.row, { date: r.date, amount: r.amount, currencyId: r.currencyId }], function (res, full) {
+      call("apiDeleteTransaction", [r.row, { date: r.date, amount: r.amount, currencyId: r.currencyId, categoryId: r.categoryId, id: r.id || "" }], function (res, full) {
         pendingDeletes--;
         toast(res.message);
         allDone(full);
@@ -1372,9 +1381,8 @@
     }
 
     // ---------- параметры ссылки (после "#") ----------
-    // sms — текст СМС от шортката (разбираем здесь, на странице);
-    // amt — сумма, cur — валюта, shop — магазин, cat — категория (старый формат ссылки от сервера), tab=history,
-    // t — ключ доступа, api — адрес сервера: их запоминаем на устройстве.
+    // sms — текст СМС от шортката (разбираем здесь, на странице); src=clip — текст взят из буфера обмена;
+    // tab=history — сразу открыть историю; t — ключ доступа, api — адрес сервера: их запоминаем на устройстве.
     // Ключ, адрес и текст СМС сразу убираем из адресной строки.
     function readParams() {
       var q = {};
@@ -1391,7 +1399,7 @@
         delete q.api;
       }
       // после обновления страницы текст СМС берём из вкладки
-      if (!q.sms && !q.amt) q.sms = session("sms") || "";
+      if (!q.sms) q.sms = session("sms") || "";
       return q;
     }
 
@@ -1413,8 +1421,7 @@
     function applyPrefill() {
       if (state.editing) return;
       var q = params, p = null;
-      if (q.amt) p = { amount: q.amt, currencyId: q.cur, categoryId: q.cat || "", merchant: q.shop || "" };
-      else if (state.smsText) {
+      if (state.smsText) {
         var r = parseBankText(state.smsText);
         if (r) p = { amount: r.amount, currencyId: r.currencyId, categoryId: merchantCategory(r.merchant), merchant: r.merchant };
         else if (state.loaded && !state.smsFailShown && looksLikeBankText(state.smsText)) {
@@ -1432,7 +1439,7 @@
       }
       fillForm(p);
       // src=clip — шорткат взял текст из буфера обмена: после сохранения буфер очистим
-      state.prefill = { merchant: p.merchant || "", fromClip: !q.amt && q.src === "clip" };
+      state.prefill = { merchant: p.merchant || "", fromClip: q.src === "clip" };
     }
 
     // ---------- загрузка ----------
