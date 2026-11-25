@@ -30,6 +30,8 @@
       --toast-text:#fff; --shadow:rgba(0,0,0,.06); --warn:#92400e; --warn-bg:#fef3c7; color-scheme:light; }
     html[data-theme="dark"] { --bg:#111317; --card:#1b1e24; --field:#23272e; --text:#e8eaed; --muted:#9aa0a6; --accent:#3b82f6; --accent-soft:#1e2a44; --line:#2f343c; --ok:#4ade80;
       --danger:#f87171; --toast:#e8eaed; --toast-text:#111317; --shadow:rgba(0,0,0,.4); --warn:#fcd34d; --warn-bg:#3a2e12; color-scheme:dark; }
+    /* значения, которые читает и скрипт (cssNum): высота строки в списке валют, длительность сдвига карточки */
+    :root { --cur-row-h:52px; --swipe-ms:250ms; }
     * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
     html { background:var(--bg); }
     body { margin:0; font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background:var(--bg); color:var(--text); font-size:16px; }
@@ -76,7 +78,7 @@
     /* выпадающий список валют, как системное меню iOS: столбик под кнопкой, у текущей — галочка слева, без подсветки; серый фон только под пальцем */
     .cur-panel { position:absolute; right:12px; width:150px; z-index:5; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:4px 0;
       background:var(--card); border:1px solid var(--line); border-radius:14px; box-shadow:0 8px 24px rgba(0,0,0,.25); }
-    .cur-panel button { display:flex; align-items:center; gap:8px; width:100%; min-height:52px; padding:6px 14px 6px 12px; border:0; background:transparent; color:var(--text); text-align:left; }
+    .cur-panel button { display:flex; align-items:center; gap:8px; width:100%; min-height:var(--cur-row-h); padding:6px 14px 6px 12px; border:0; background:transparent; color:var(--text); text-align:left; }
     .cur-panel button + button { border-top:1px solid var(--line); }
     .cur-panel .code { flex:1; font-size:20px; font-weight:600; }
     .cur-panel .check { flex:0 0 20px; color:var(--text); font-size:18px; font-weight:600; text-align:center; }
@@ -147,7 +149,7 @@
     /* строка истории: карточка сдвигается свайпом влево и открывает кнопку «Удалить» */
     .row { position:relative; margin-bottom:10px; border-radius:14px; overflow:hidden; }
     .row .card { margin-bottom:0; }
-    .tx { position:relative; z-index:1; display:flex; align-items:center; gap:8px; padding:14px 16px; touch-action:pan-y; transition:transform .25s ease; will-change:transform; }
+    .tx { position:relative; z-index:1; display:flex; align-items:center; gap:8px; padding:14px 16px; touch-action:pan-y; transition:transform var(--swipe-ms) ease; will-change:transform; }
     .swipe-del { position:absolute; top:0; right:0; bottom:0; width:96px; padding-left:8px; border:0; background:var(--danger); color:#fff; font-size:15px; visibility:hidden; }
     .row.swiping .swipe-del { visibility:visible; }
     .row.swiping .tx { border-radius:0; }
@@ -273,6 +275,11 @@
       loaded: false, loadError: "", offline: false, touched: false, smsText: "", smsFailShown: false };
 
     function el(id) { return document.getElementById(id); }
+    // число из CSS-переменной ("52px", "250ms" → 52, 250): одно значение и для стилей, и для кода
+    function cssNum(name, fallback) {
+      var v = parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name));
+      return isFinite(v) ? v : fallback;
+    }
     function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
     function store(key, value) {
       try {
@@ -290,12 +297,14 @@
 
     // ---------- уведомление ----------
     // isError — красное уведомление (ошибка); ms — сколько показывать, если нужно дольше обычного
+    // сколько держится уведомление: обычное, «Сохранено», подсказка или предупреждение, ошибка
+    var TOAST_MS = 2500, TOAST_SHORT_MS = 2000, TOAST_LONG_MS = 4000, TOAST_ERROR_MS = 5000;
     function toast(text, isError, ms) {
       var t = el("toast");
       t.textContent = text;
       t.className = "toast show" + (isError ? " err" : "");
       clearTimeout(toast.timer);
-      toast.timer = setTimeout(function () { t.className = "toast" + (isError ? " err" : ""); }, ms || (isError ? 5000 : 2500));
+      toast.timer = setTimeout(function () { t.className = "toast" + (isError ? " err" : ""); }, ms || (isError ? TOAST_ERROR_MS : TOAST_MS));
     }
 
     // любое касание страницы или нажатие клавиши убирает уведомление: пользователь уже приступил к делу.
@@ -428,8 +437,10 @@
       return Number(s);
     }
 
+    // Те же правила, что normalizeMerchant_ на сервере: по этим ключам сервер присылает категории магазинов.
+    var MERCHANT_MAX = 100; // длина названия; сервер присылает своё значение в init (limits)
     function normalizeMerchant(name) {
-      return String(name || "").replace(/\s+/g, " ").trim().replace(/^[=+\-@'\s]+/, "").slice(0, 100).toUpperCase();
+      return String(name || "").replace(/\s+/g, " ").trim().replace(/^[=+\-@'\s]+/, "").slice(0, MERCHANT_MAX).toUpperCase();
     }
 
     // категория, которую магазин получил в прошлый раз (только подсказка)
@@ -506,10 +517,11 @@
       el("themeKnob").innerHTML = (dark ? document.querySelector("#themeSwitch .moon") : document.querySelector("#themeSwitch .sun")).outerHTML.replace(/class="[^"]*"/, "");
     }
     // долгое нажатие на переключатель темы — диагностика размеров окна (для подгонки кнопок под экран)
+    var LONG_PRESS_MS = 700; // столько держать палец на переключателе темы
     var themeLong = false, themeTimer = null;
     el("themeSwitch").addEventListener("pointerdown", function () {
       themeLong = false;
-      themeTimer = setTimeout(function () { themeLong = true; showDiag(); }, 700);
+      themeTimer = setTimeout(function () { themeLong = true; showDiag(); }, LONG_PRESS_MS);
     });
     ["pointerup", "pointerleave", "pointercancel"].forEach(function (ev) { el("themeSwitch").addEventListener(ev, function () { clearTimeout(themeTimer); }); });
     function onThemeTap() { if (themeLong) { themeLong = false; return; } toggleTheme(); }
@@ -549,7 +561,8 @@
     var stats = { pane: "ops", kind: "p", offset: 0, cache: {}, seq: 0 };
     var MON_GEN = ["янв", "фев", "мар", "апр", "мая", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
     var MON_NOM = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
-    function periodStartDay() { return state.periodStartDay || 20; }
+    var PERIOD_START_DAY = 20; // до ответа сервера; сервер присылает своё значение (periodStartDay в init)
+    function periodStartDay() { return state.periodStartDay || PERIOD_START_DAY; }
     function pad2(n) { return (n < 10 ? "0" : "") + n; }
     function mkd(y, m, d) { return new Date(y, m, d, 12); } // полдень — без сюрпризов с переводом часов
     function dkey(d) { return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate()); }
@@ -686,11 +699,12 @@
     var FIT_SETTLE_MS = 2500, fitT0 = Date.now(), fitSig = "", fitForce = false;
     function fitSettling() { return Date.now() - fitT0 < FIT_SETTLE_MS; }
     // журнал размеров окна для диагностики (долгое нажатие на переключатель темы)
+    var FIT_LOG_MAX = 30; // строк в журнале
     var fitLog = [];
     function fitNote(what) {
       fitLog.push(((Date.now() - fitT0) / 1000).toFixed(2) + "s " + what + " · ih " + window.innerHeight +
         (window.visualViewport ? " vv " + Math.round(window.visualViewport.height) : "") + " sh " + screen.height);
-      if (fitLog.length > 30) fitLog.shift();
+      if (fitLog.length > FIT_LOG_MAX) fitLog.shift();
     }
     function scheduleFit() {
       if (fitQueued) return;
@@ -742,11 +756,12 @@
     }
 
     // поворот экрана и смена ширины — пересчёт; изменение высоты при прокрутке (панели браузера) — нет
+    var FIT_RESIZE_MIN_PX = 120; // высота окна (вверху страницы) изменилась больше чем на столько — тоже пересчёт
     window.addEventListener("resize", function () {
       var w = window.innerWidth, hgt = window.innerHeight;
       fitNote("resize");
       if (fitSettling()) { lastSize = { w: w, h: hgt }; scheduleFit(); return; }
-      if (w !== lastSize.w || (window.pageYOffset === 0 && Math.abs(hgt - lastSize.h) > 120)) { lastSize = { w: w, h: hgt }; fitForce = true; scheduleFit(); }
+      if (w !== lastSize.w || (window.pageYOffset === 0 && Math.abs(hgt - lastSize.h) > FIT_RESIZE_MIN_PX)) { lastSize = { w: w, h: hgt }; fitForce = true; scheduleFit(); }
     });
     // в конце «устаканивания» — последняя сверка (если высота поменялась без события resize)
     setTimeout(function () { fitNote("конец"); fitForce = true; scheduleFit(); }, FIT_SETTLE_MS);
@@ -949,13 +964,15 @@
       if (state.currencies.indexOf(c) > -1) el("currency").value = c;
       syncCurBtn();
     }
+    // список валют не ниже CUR_PANEL_MIN_ROWS строк, даже на низком экране; CUR_PANEL_PAD — отступы панели сверху и снизу (padding в CSS)
+    var CUR_PANEL_MIN_ROWS = 4, CUR_PANEL_PAD = 8;
     function toggleCurPanel() {
       if (!el("curPanel").classList.contains("hidden")) { closeCurPanel(); return; }
       var f = el("amountField"), p = el("curPanel"), cur = el("currency").value;
       p.style.top = (f.offsetTop + f.offsetHeight + 6) + "px";
       // не длиннее видимой части экрана над панелью браузера: если валют много — список прокручивается
       var room = window.innerHeight - fitReserve() - (f.getBoundingClientRect().bottom + 6) - 8;
-      p.style.maxHeight = Math.max(4 * 52 + 8, room) + "px";
+      p.style.maxHeight = Math.max(CUR_PANEL_MIN_ROWS * cssNum("--cur-row-h", 52) + CUR_PANEL_PAD, room) + "px";
       p.innerHTML = state.currencies.map(function (c, i) {
         var on = c === cur;
         return '<button role="menuitemradio" aria-checked="' + on + '" class="' + (on ? "on" : "") + '" onclick="pickCurrency(' + i + ')">' +
@@ -1029,7 +1046,7 @@
       if (/^\s*[-+]?[\d\s.,]+\s*$/.test(text)) return; // обычное число — вставляем как есть
       e.preventDefault();
       var r = parseBankText(text);
-      if (!r) { toast(state.loaded ? "В тексте нет суммы с валютой — введите вручную" : "Справочники ещё загружаются — попробуйте через пару секунд", false, 4000); return; }
+      if (!r) { toast(state.loaded ? "В тексте нет суммы с валютой — введите вручную" : "Справочники ещё загружаются — попробуйте через пару секунд", false, TOAST_LONG_MS); return; }
       fillForm({ amount: r.amount, currencyId: r.currencyId, categoryId: merchantCategory(r.merchant) });
       state.prefill = { merchant: r.merchant || "", fromClip: true }; // вставили из буфера — после сохранения очистим его
       state.touched = true;
@@ -1050,7 +1067,7 @@
     function save() {
       var form = readForm();
       if (!form) return;
-      if (state.editing && navigator.onLine === false) { toast(NO_NET_EDIT, false, 3000); return; }
+      if (state.editing && navigator.onLine === false) { toast(NO_NET_EDIT, false, TOAST_LONG_MS); return; }
       setSaving(true);
       if (state.editing) {
         var ed = state.editing;
@@ -1060,7 +1077,7 @@
           cancelEdit();
           showRecent(full);
         }, function (msg, kind) {
-          if (kind === "network") toast(NO_NET_EDIT, false, 3000); else toast(msg, true);
+          if (kind === "network") toast(NO_NET_EDIT, false, TOAST_LONG_MS); else toast(msg, true);
         });
         return;
       }
@@ -1081,7 +1098,7 @@
       clearUrl();
       setSaving(false);
       toast(offline ? "Нет связи — сохранено на телефоне, отправится позже"
-        : "Сохранено: " + fmtNum(form.amount) + " " + form.currencyId + " · " + (categoryName(form.categoryId) || form.categoryId), false, offline ? 3000 : 2000);
+        : "Сохранено: " + fmtNum(form.amount) + " " + form.currencyId + " · " + (categoryName(form.categoryId) || form.categoryId), false, offline ? TOAST_LONG_MS : TOAST_SHORT_MS);
       flushOutbox(true); // пробуем сразу, даже если плашка «Нет связи» ещё висит — связь могла вернуться
     }
     function clearClipboard() {
@@ -1138,13 +1155,15 @@
 
     // ---------- удаление: свайп влево открывает кнопку «Удалить» ----------
     var REVEAL = 88; // на сколько уезжает карточка
+    var SWIPE_START_PX = 8; // сдвиг пальца, после которого понятно: это свайп или прокрутка
+    var SWIPE_ANIM_MS = cssNum("--swipe-ms", 250); // длительность сдвига карточки (задана в CSS)
     var swipe = { row: null, startX: 0, startY: 0, base: 0, x: 0, active: false, moved: false, openRow: null, swallow: false };
     function setX(row, x, animate) {
       var c = row.querySelector(".tx");
       c.style.transition = animate ? "" : "none";
       c.style.transform = x ? "translateX(" + x + "px)" : "";
       if (x < 0) row.classList.add("swiping");
-      else if (animate) setTimeout(function () { if (!c.style.transform) row.classList.remove("swiping"); }, 250);
+      else if (animate) setTimeout(function () { if (!c.style.transform) row.classList.remove("swiping"); }, SWIPE_ANIM_MS);
       else row.classList.remove("swiping");
     }
     function closeOpenRow() { if (swipe.openRow) { setX(swipe.openRow, 0, true); swipe.openRow = null; } }
@@ -1165,7 +1184,7 @@
       if (!swipe.row) return;
       var dx = e.clientX - swipe.startX, dy = e.clientY - swipe.startY;
       if (!swipe.active) {
-        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+        if (Math.abs(dx) < SWIPE_START_PX && Math.abs(dy) < SWIPE_START_PX) return;
         if (Math.abs(dy) >= Math.abs(dx)) { swipe.row = null; return; } // вертикально — это прокрутка
         swipe.active = true; swipe.moved = true;
         if (swipe.openRow && swipe.openRow !== swipe.row) closeOpenRow();
@@ -1213,7 +1232,11 @@
     // ---------- подгрузка старых операций при прокрутке истории ----------
     // state.recent — всё, что показано: первая страница от сервера и подгруженные старые.
     // Сервер в ответах присылает только первую страницу — старые подгруженные сохраняем (withOlder).
+    // HIST_PAGE и SEND_BATCH сервер присылает в init (limits); здесь — значения до первого ответа
     var HIST_PAGE = 50;
+    var HIST_PRELOAD_SCREENS = 2.5; // до конца списка меньше стольких экранов — грузим следующую страницу
+    var HIST_REDRAW_RETRY_MS = 400; // пока открыт свайп или идёт удаление — пробуем перерисовать через столько
+    var HIST_ONLINE_DELAY_MS = 500; // связь вернулась — подгрузку истории пробуем чуть позже
     var hist = { loading: false, done: false, failed: false, next: 0 }; // next — с какой строки таблицы грузить дальше
     function opKey(x) { return x.id || [x.date, x.amount, x.currencyId, x.categoryId].join("|"); }
     function minRow(list) { return list.reduce(function (m, x) { return Math.min(m, Number(x.row) || Infinity); }, Infinity); }
@@ -1248,7 +1271,7 @@
         var items = res.items || [];
         (function apply() {
           // пока открыт свайп или идёт удаление — подождём, чтобы не сбить строки под пальцем
-          if (!canRedrawHistory() || pendingDeletes > 0) { setTimeout(apply, 400); return; }
+          if (!canRedrawHistory() || pendingDeletes > 0) { setTimeout(apply, HIST_REDRAW_RETRY_MS); return; }
           var have = {};
           state.recent.forEach(function (x) { have[opKey(x)] = 1; });
           var add = items.filter(function (x) { return !have[opKey(x)]; });
@@ -1273,18 +1296,18 @@
       else if (state.offline || navigator.onLine === false) m.innerHTML = '<span class="muted">Старые операции загрузятся, когда будет связь</span>';
       else m.innerHTML = "";
     }
-    // до конца списка осталось меньше полутора экранов — грузим следующую страницу
+    // до конца списка осталось меньше HIST_PRELOAD_SCREENS экранов — грузим следующую страницу
     function checkMore() {
       if (!historyVisible()) return;
-      if (el("histMore").getBoundingClientRect().top < window.innerHeight * 2.5) loadOlder();
+      if (el("histMore").getBoundingClientRect().top < window.innerHeight * HIST_PRELOAD_SCREENS) loadOlder();
     }
     window.addEventListener("scroll", checkMore, { passive: true });
-    window.addEventListener("online", function () { setTimeout(checkMore, 500); });
+    window.addEventListener("online", function () { setTimeout(checkMore, HIST_ONLINE_DELAY_MS); });
     function canRedrawHistory() { return !state.editing && !swipe.openRow && !swipe.row; }
     function deleteRow(i) {
       var r = state.recent[i];
       if (!r) return;
-      if (navigator.onLine === false) { closeOpenRow(); toast(NO_NET_DELETE, false, 3000); return; }
+      if (navigator.onLine === false) { closeOpenRow(); toast(NO_NET_DELETE, false, TOAST_LONG_MS); return; }
       pendingDeletes++;
       // строки ниже удаляемой в таблице сдвинутся вверх на одну
       var rest = state.recent.filter(function (x, k) { return k !== i; }).map(function (x) {
@@ -1307,7 +1330,7 @@
         allDone(full);
       }, function (msg, kind) {
         pendingDeletes--;
-        if (kind === "network") toast(NO_NET_DELETE, false, 3000); else toast(msg, true);
+        if (kind === "network") toast(NO_NET_DELETE, false, TOAST_LONG_MS); else toast(msg, true);
         if (kind !== "network") deleteFailed = true; // без связи перечитать всё равно не выйдет
         var back = state.recent.concat([r]).sort(byDateDesc);
         if (canRedrawHistory()) renderHistory(back); else state.recent = back;
@@ -1428,7 +1451,7 @@
           // подсказываем, только если это явно сообщение банка (например, банк поменял формат);
           // любой другой текст из буфера молча оставляет форму пустой
           state.smsFailShown = true;
-          toast("Не получилось разобрать сообщение банка — введите сумму вручную", false, 4000);
+          toast("Не получилось разобрать сообщение банка — введите сумму вручную", false, TOAST_LONG_MS);
         }
       }
       if (!p) return;
@@ -1455,6 +1478,7 @@
       state.merchants = data.merchants || state.merchants || {};
       state.todayKey = data.todayKey || state.todayKey || "";
       if (data.periodStartDay) state.periodStartDay = data.periodStartDay;
+      applyLimits(data.limits);
       state.loaded = true;
       state.loadError = "";
       renderCurrencies(cur);
@@ -1465,12 +1489,20 @@
       applyPrefill();
     }
 
+    // числа, общие с сервером (limits в ответе init): страница истории, пачка отправки, длина названия магазина
+    function applyLimits(l) {
+      if (!l) return;
+      if (l.historyPage > 0) HIST_PAGE = l.historyPage;
+      if (l.sendBatch > 0) SEND_BATCH = l.sendBatch;
+      if (l.merchantMax > 0) MERCHANT_MAX = l.merchantMax;
+    }
+
     function load() {
       if (!state.loaded) { state.loadError = ""; renderCategories(); renderHistory(null); }
       el("netRetry").disabled = true;
       call("apiGetInitData", [], function (data) {
         el("netRetry").disabled = false;
-        cacheInit({ categories: data.categories, currencies: data.currencies, merchants: data.merchants || {}, recent: data.recent, todayKey: data.todayKey, periodStartDay: data.periodStartDay });
+        cacheInit({ categories: data.categories, currencies: data.currencies, merchants: data.merchants || {}, recent: data.recent, todayKey: data.todayKey, periodStartDay: data.periodStartDay, limits: data.limits });
         applyData(data);
         flushOutbox(); // связь есть — отправляем траты, отложенные без связи
         flushCancels(); // и удаляем на сервере то, что удалили, пока оно отправлялось
