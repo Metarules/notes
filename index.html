@@ -198,8 +198,6 @@
     .setrow .val { color:var(--muted); }
     .setrow .chev { color:var(--muted); font-size:20px; line-height:1; }
     button.setrow { width:100%; border:0; background:transparent; text-align:left; font-family:inherit; }
-    .theme-seg { margin:0; flex:0 0 auto; }
-    .theme-seg button { flex:0 0 auto; padding:6px 10px; font-size:14px; }
   </style>
 </head>
 <body>
@@ -256,16 +254,6 @@
     </section>
 
     <section id="view-settings" class="hidden">
-      <div class="sect">Оформление</div>
-      <div class="card setlist">
-        <div class="setrow"><span>Тема</span>
-          <div class="seg theme-seg" id="themeSeg" role="radiogroup" aria-label="Тема">
-            <button data-t="light" role="radio" onclick="setTheme('light')">Светлая</button>
-            <button data-t="dark" role="radio" onclick="setTheme('dark')">Тёмная</button>
-            <button data-t="auto" role="radio" onclick="setTheme('auto')">Авто</button>
-          </div>
-        </div>
-      </div>
       <div class="sect">О форме</div>
       <div class="card setlist">
         <div class="setrow"><span>Версия страницы</span><span class="val" id="verPage"></span></div>
@@ -313,7 +301,7 @@
     // Номер релиза страницы = число коммитов index.html на GitHub, включая тот, где он записан
     // (git rev-list --count HEAD -- index.html): +1 при каждом изменении страницы. Виден внизу формы
     // рядом с номером сервера — так понятно, что телефон открыл свежую страницу, а не старую из кэша.
-    var PAGE_VERSION = 37;
+    var PAGE_VERSION = 38;
 
     var state = { categories: [], currencies: [], merchants: {}, recent: [], prefill: null, editing: null, savedNew: null, sign: -1, categoryId: "", todayKey: "",
       loaded: false, loadError: "", offline: false, touched: false, smsText: "", smsFailShown: false };
@@ -571,8 +559,8 @@
       el("themeSwitch").setAttribute("aria-checked", dark ? "true" : "false");
       el("themeKnob").innerHTML = (dark ? document.querySelector("#themeSwitch .moon") : document.querySelector("#themeSwitch .sun")).outerHTML.replace(/class="[^"]*"/, "");
     }
-    // Тема: тумблер на форме — светлая/тёмная (выбор запоминается на этом устройстве);
-    // на экране «Настройки» — ещё «Авто»: как в системе, хранится как отсутствие выбора.
+    // Тема: тумблер на форме — светлая/тёмная, выбор запоминается на этом устройстве.
+    // Пока тумблер не трогали, тема как в системе («auto» — отсутствие выбора) и меняется вместе с ней.
     var darkQuery = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
     function themeMode() { var t = store("theme"); return t === "dark" || t === "light" ? t : "auto"; }
     function applyTheme() {
@@ -580,14 +568,9 @@
       var t = m === "auto" ? (darkQuery && darkQuery.matches ? "dark" : "light") : m;
       document.documentElement.setAttribute("data-theme", t);
       updateThemeBtn();
-      [].forEach.call(document.querySelectorAll("#themeSeg button"), function (b) {
-        var on = b.getAttribute("data-t") === m;
-        b.classList.toggle("on", on);
-        b.setAttribute("aria-checked", on ? "true" : "false");
-      });
     }
     function setTheme(m) { store("theme", m === "auto" ? null : m); applyTheme(); }
-    // «Авто»: система сменила тему (например, вечером) — меняемся вместе с ней
+    // выбора нет, а система сменила тему (например, вечером) — меняемся вместе с ней
     if (darkQuery) {
       var onSystemTheme = function () { if (themeMode() === "auto") applyTheme(); };
       if (darkQuery.addEventListener) darkQuery.addEventListener("change", onSystemTheme);
