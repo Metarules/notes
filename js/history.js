@@ -247,14 +247,15 @@ function renderHistory(items) {
     if (r.dayKey !== lastDay) { html += dayHead(r.dayKey); lastDay = r.dayKey; }
     var n = Number(r.amount);
     var name = r.categoryName || categoryName(r.categoryId) || "Без категории";
-    // pending — изменение ещё не подтверждено сервером: карточка приглушена и не нажимается
-    html += '<div class="row' + (r.pending ? " busy" : "") + '" data-i="' + i + '">' +
+    // pending — изменение ещё не подтверждено сервером: карточка приглушена, не нажимается и подписана «сохраняется…»
+    html += '<div class="row' + (r.pending ? " saving" : "") + '" data-i="' + i + '">' +
       '<button class="swipe-del" aria-label="Удалить">Удалить</button>' +
       '<div class="card tx">' +
       '<div class="tx-main">' +
         '<div><span class="amount' + (n > 0 ? " pos" : "") + '">' + esc(fmtNum(n)) + " " + esc(r.currencyId) + '</span>' +
         (r.amountEUR !== "" && r.currencyId !== "EUR" ? ' <span class="muted">' + esc(fmtNum(r.amountEUR)) + ' EUR</span>' : '') + '</div>' +
         '<div class="tx-sub">' + esc(name) + (r.time ? ' · ' + esc(r.time) : '') + '</div>' +
+        (r.pending ? '<div class="tx-sub tx-status"><span class="q sending"><span class="q-spin"></span>сохраняется…</span></div>' : '') +
       '</div>' +
       '</div></div>';
   });

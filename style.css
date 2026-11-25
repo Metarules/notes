@@ -145,8 +145,11 @@ button { font-family:inherit; cursor:pointer; }
 .tx-sub { color:var(--muted); font-size:13px; margin-top:5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .amount { font-weight:600; }
 .amount.pos { color:var(--ok); }
-.row.busy { pointer-events:none; }
-.row.busy .tx { opacity:.55; }
+/* изменение ждёт ответа сервера: карточка приглушена как в очереди, не нажимается, внизу — «сохраняется…» */
+.row.saving { pointer-events:none; }
+.row.saving .tx { opacity:.75; }
+.row.saving .tx-status { margin-top:3px; white-space:normal; }
+.row.saving .tx-sub .q.sending { color:var(--accent); }
 .mini-spinner { display:inline-block; width:16px; height:16px; border:2px solid rgba(255,255,255,.45); border-top-color:#fff; border-radius:50%; animation:spin .8s linear infinite;
   vertical-align:middle; }
 /* уведомление внизу, поверх содержимого */
