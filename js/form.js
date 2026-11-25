@@ -13,7 +13,7 @@ function toggleSign() { setSign(-state.sign); formChanged(true); }
 function pendingBlock(cls) {
   // нет связи — о ней уже говорит плашка сверху, здесь только тихая пометка
   if (state.offline) return '<div class="' + cls + '"><span class="muted">Загрузится, когда будет связь</span></div>';
-  if (state.loadError) return '<div class="' + cls + '"><span class="muted">' + esc(state.loadError) + '</span><button class="link" style="width:auto;margin:0" onclick="load()">Повторить</button></div>';
+  if (state.loadError) return '<div class="' + cls + '"><span class="muted">' + esc(state.loadError) + '</span><button class="link inline" data-act="load">Повторить</button></div>';
   return '<div class="' + cls + '"><span class="spinner sm"></span></div>';
 }
 
@@ -27,7 +27,7 @@ function renderCategories() {
   if (!state.loaded) { el("catGrid").innerHTML = pendingBlock("pending"); updateSaveBtn(); return; }
   el("catGrid").innerHTML = state.categories.map(function (c, i) {
     var n = splitName(c.categoryName);
-    return '<button class="chip' + (c.categoryId === state.categoryId ? " on" : "") + '" onclick="userPickCategory(' + i + ')">' +
+    return '<button class="chip' + (c.categoryId === state.categoryId ? " on" : "") + '" data-act="userPickCategory" data-arg="' + i + '">' +
       (n.emo ? '<span class="emo">' + esc(n.emo) + '</span>' : '') +
       '<span class="name">' + esc(n.label) + '</span></button>';
   }).join("");
@@ -75,7 +75,7 @@ function toggleCurPanel() {
   p.style.maxHeight = Math.max(CUR_PANEL_MIN_ROWS * cssNum("--cur-row-h", 52) + CUR_PANEL_PAD, room) + "px";
   p.innerHTML = state.currencies.map(function (c, i) {
     var on = c === cur;
-    return '<button role="menuitemradio" aria-checked="' + on + '" class="' + (on ? "on" : "") + '" onclick="pickCurrency(' + i + ')">' +
+    return '<button role="menuitemradio" aria-checked="' + on + '" class="' + (on ? "on" : "") + '" data-act="pickCurrency" data-arg="' + i + '">' +
       '<span class="check" aria-hidden="true">' + (on ? "✓" : "") + '</span>' +
       '<span class="code">' + esc(c) + '</span></button>';
   }).join("");

@@ -138,7 +138,7 @@ function renderMore() {
   var m = el("histMore");
   if (!state.loaded || !(state.recent || []).length) { m.innerHTML = ""; return; }
   if (hist.loading) m.innerHTML = '<span class="spinner sm"></span>';
-  else if (hist.failed) m.innerHTML = '<span class="muted">Старые операции не загрузились</span><button class="link" style="width:auto;margin:0" onclick="retryOlder()">Повторить</button>';
+  else if (hist.failed) m.innerHTML = '<span class="muted">Старые операции не загрузились</span><button class="link inline" data-act="retryOlder">Повторить</button>';
   else if (hist.done) m.innerHTML = '<span class="muted">Это все операции</span>';
   else if (state.offline || navigator.onLine === false) m.innerHTML = '<span class="muted">Старые операции загрузятся, когда будет связь</span>';
   else m.innerHTML = "";

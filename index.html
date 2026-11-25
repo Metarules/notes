@@ -3,8 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <!-- данные уходят только на сервер Apps Script; чужие скрипты, картинки и формы запрещены -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self'; connect-src https://script.google.com https://script.googleusercontent.com; form-action 'none'; base-uri 'none'; object-src 'none'">
+  <!-- данные уходят только на сервер Apps Script; чужие скрипты, картинки и формы запрещены,
+       встроенные скрипты, обработчики onclick="…" и стили style="…" — тоже: даже если в текст из таблицы
+       проберётся код мимо esc(), браузер его не выполнит -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src https://script.google.com https://script.googleusercontent.com; form-action 'none'; base-uri 'none'; object-src 'none'">
   <meta name="referrer" content="no-referrer">
   <meta name="robots" content="noindex, nofollow">
   <meta name="theme-color" content="#f6f7f9" media="(prefers-color-scheme: light)">
@@ -17,65 +19,59 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="icon" href="icons/icon-192.png">
   <title>Бюджет</title>
-  <script>
-    (function () {
-      var t = null;
-      try { t = localStorage.getItem("theme"); } catch (e) {}
-      if (t !== "dark" && t !== "light") t = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-      document.documentElement.setAttribute("data-theme", t);
-    })();
-  </script>
-  <link rel="stylesheet" href="style.css?v=39">
+  <!-- тема — до отрисовки страницы, чтобы не мигала светлая; отдельным файлом: встроенные скрипты запрещены (CSP) -->
+  <script src="js/theme-init.js?v=40"></script>
+  <link rel="stylesheet" href="style.css?v=40">
 </head>
 <body>
   <div id="loader" class="loader">
     <div class="spinner" id="spinner"></div>
     <div id="loaderText" class="muted"></div>
-    <button id="retryBtn" class="link hidden" style="width:auto" onclick="load()">Повторить</button>
+    <button id="retryBtn" class="link auto hidden" data-act="load">Повторить</button>
   </div>
 
   <div id="app" class="wrap hidden">
     <div id="netBar" class="netbar hidden" role="status">
       <div class="nb-text"><span class="nb-title">Нет связи</span><span id="netText" class="nb-sub"></span></div>
-      <button id="netRetry" onclick="load()">Повторить</button>
+      <button id="netRetry" data-act="load">Повторить</button>
     </div>
     <div id="histBar" class="editbar hidden">
-      <button class="back" onclick="showTab('add')" aria-label="Назад к вводу">←</button>
+      <button class="back" data-act="showTab" data-arg="add" aria-label="Назад к вводу">←</button>
       <span class="title">История</span>
     </div>
     <div id="setBar" class="editbar hidden">
-      <button class="back" onclick="showTab('add')" aria-label="Назад к вводу">←</button>
+      <button class="back" data-act="showTab" data-arg="add" aria-label="Назад к вводу">←</button>
       <span class="title">Настройки</span>
     </div>
     <div id="editBar" class="editbar hidden">
-      <button class="back" onclick="cancelEdit()" aria-label="Назад">←</button>
+      <button class="back" data-act="cancelEdit" aria-label="Назад">←</button>
       <span class="title">Изменение операции <span id="editDate" class="date"></span></span>
     </div>
 
     <section id="view-add">
       <div class="card">
         <div id="amountField" class="amount-field">
-          <button id="signBtn" class="sign" onclick="toggleSign()" aria-label="Сменить знак">−</button>
+          <button id="signBtn" class="sign" data-act="toggleSign" aria-label="Сменить знак">−</button>
           <input id="amount" inputmode="decimal" placeholder="0" autocomplete="off">
-          <button id="clearAmt" class="clear hidden" onclick="clearAmount()" aria-label="Стереть сумму">✕</button>
+          <button id="clearAmt" class="clear hidden" data-act="clearAmount" aria-label="Стереть сумму">✕</button>
           <select id="currency" aria-hidden="true" tabindex="-1"></select>
-          <button id="curBtn" class="cur-btn" onclick="toggleCurPanel()" aria-label="Валюта" aria-haspopup="true" aria-expanded="false">…</button>
+          <button id="curBtn" class="cur-btn" data-act="toggleCurPanel" aria-label="Валюта" aria-haspopup="true" aria-expanded="false">…</button>
         </div>
         <div id="curPanel" class="cur-panel hidden" role="menu" aria-label="Выбор валюты"></div>
         <div id="catGrid" class="grid"></div>
-        <button class="btn" id="saveBtn" onclick="save()" disabled>Сохранить</button>
+        <button class="btn" id="saveBtn" data-act="save" disabled>Сохранить</button>
       </div>
       <div id="navRow" class="navrow">
-        <button id="histLink" class="hist-link" onclick="showTab('history')">
+        <button id="histLink" class="hist-link" data-act="showTab" data-arg="history">
           История<span class="chev" aria-hidden="true">›</span>
         </button>
         <div class="nav-right">
-          <button id="themeSwitch" class="theme-switch" role="switch" aria-checked="false" aria-label="Тёмная тема" onclick="toggleTheme()">
+          <button id="themeSwitch" class="theme-switch" role="switch" aria-checked="false" aria-label="Тёмная тема" data-act="toggleTheme">
             <svg class="ico sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
             <svg class="ico moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/></svg>
             <span class="knob" id="themeKnob" aria-hidden="true"></span>
           </button>
-          <button id="settingsBtn" class="icon-btn" onclick="showTab('settings')" aria-label="Настройки"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z"/><circle cx="12" cy="12" r="3"/></svg></button>
+          <button id="settingsBtn" class="icon-btn" data-act="showTab" data-arg="settings" aria-label="Настройки"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z"/><circle cx="12" cy="12" r="3"/></svg></button>
         </div>
       </div>
     </section>
@@ -85,14 +81,14 @@
       <div class="card setlist">
         <div class="setrow"><span>Версия страницы</span><span class="val" id="verPage"></span></div>
         <div class="setrow"><span>Версия сервера</span><span class="val" id="verServer"></span></div>
-        <button class="setrow" onclick="openDiag()"><span>Диагностика экрана</span><span class="chev" aria-hidden="true">›</span></button>
+        <button class="setrow" data-act="openDiag"><span>Диагностика экрана</span><span class="chev" aria-hidden="true">›</span></button>
       </div>
     </section>
 
     <section id="view-history" class="hidden">
       <div class="seg" role="tablist">
-        <button id="segOps" class="on" role="tab" onclick="showHistPane('ops')">Операции</button>
-        <button id="segStats" role="tab" onclick="showHistPane('stats')">Статистика</button>
+        <button id="segOps" class="on" role="tab" data-act="showHistPane" data-arg="ops">Операции</button>
+        <button id="segStats" role="tab" data-act="showHistPane" data-arg="stats">Статистика</button>
       </div>
       <div id="paneOps">
         <div id="historyList"></div>
@@ -100,19 +96,19 @@
       </div>
       <div id="paneStats" class="hidden">
         <div class="seg kinds" id="kindSeg" role="tablist">
-          <button data-k="p" class="on" onclick="setStatsKind('p')"></button>
-          <button data-k="m" onclick="setStatsKind('m')">Месяц</button>
-          <button data-k="y" onclick="setStatsKind('y')">Год</button>
-          <button data-k="c" onclick="setStatsKind('c')">Даты</button>
+          <button data-k="p" class="on" data-act="setStatsKind" data-arg="p"></button>
+          <button data-k="m" data-act="setStatsKind" data-arg="m">Месяц</button>
+          <button data-k="y" data-act="setStatsKind" data-arg="y">Год</button>
+          <button data-k="c" data-act="setStatsKind" data-arg="c">Даты</button>
         </div>
         <div class="pnav" id="pNav">
-          <button id="pPrev" onclick="shiftStats(-1)" aria-label="Раньше">‹</button>
+          <button id="pPrev" data-act="shiftStats" data-arg="-1" aria-label="Раньше">‹</button>
           <span class="lbl" id="pLabel"></span>
-          <button id="pNext" onclick="shiftStats(1)" aria-label="Позже">›</button>
+          <button id="pNext" data-act="shiftStats" data-arg="1" aria-label="Позже">›</button>
         </div>
         <div class="pdates hidden" id="pDates">
-          <label>С<input type="date" id="dFrom" onchange="loadStats()"></label>
-          <label>По<input type="date" id="dTo" onchange="loadStats()"></label>
+          <label>С<input type="date" id="dFrom" data-change="loadStats"></label>
+          <label>По<input type="date" id="dTo" data-change="loadStats"></label>
         </div>
         <div id="statsBody"></div>
       </div>
@@ -123,15 +119,16 @@
 
   <!-- скрипты страницы: обычные (не модули), по порядку — app.js с запуском последним.
        ?v= — номер релиза страницы: после обновления телефон не возьмёт старый файл из кэша -->
-  <script src="js/core.js?v=39"></script>
-  <script src="js/api.js?v=39"></script>
-  <script src="js/sms.js?v=39"></script>
-  <script src="js/theme.js?v=39"></script>
-  <script src="js/stats.js?v=39"></script>
-  <script src="js/layout.js?v=39"></script>
-  <script src="js/queue.js?v=39"></script>
-  <script src="js/form.js?v=39"></script>
-  <script src="js/history.js?v=39"></script>
-  <script src="js/app.js?v=39"></script>
+  <script src="js/core.js?v=40"></script>
+  <script src="js/api.js?v=40"></script>
+  <script src="js/sms.js?v=40"></script>
+  <script src="js/theme.js?v=40"></script>
+  <script src="js/stats.js?v=40"></script>
+  <script src="js/layout.js?v=40"></script>
+  <script src="js/queue.js?v=40"></script>
+  <script src="js/form.js?v=40"></script>
+  <script src="js/history.js?v=40"></script>
+  <script src="js/actions.js?v=40"></script>
+  <script src="js/app.js?v=40"></script>
 </body>
 </html>

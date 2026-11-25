@@ -63,7 +63,7 @@ function loadStats() {
   el("pDates").classList.toggle("hidden", k !== "c");
   if (k === "c") {
     r = { from: fromKey(el("dFrom").value), to: fromKey(el("dTo").value) };
-    if (!r.from || !r.to || r.from > r.to) { el("statsBody").innerHTML = '<p class="muted" style="text-align:center">Выберите даты: «С» не позже «По»</p>'; return; }
+    if (!r.from || !r.to || r.from > r.to) { el("statsBody").innerHTML = '<p class="muted center">Выберите даты: «С» не позже «По»</p>'; return; }
   } else {
     r = rangeFor(k, stats.offset);
     el("pLabel").textContent = rangeLabel(k, r);
@@ -83,7 +83,7 @@ function loadStats() {
   }, function (msg, kind) {
     if (seq !== stats.seq || cached) return;
     el("statsBody").innerHTML = '<div class="pending tall"><span class="muted">' + esc(kind === "network" ? MSG_STATS_WAIT_NET : "Не загрузилось: " + msg) +
-      '</span><button class="link" style="width:auto;margin:0" onclick="loadStats()">Повторить</button></div>';
+      '</span><button class="link inline" data-act="loadStats">Повторить</button></div>';
   });
 }
 function renderStats(res) {
@@ -93,7 +93,7 @@ function renderStats(res) {
   var bal = Math.round(((res.income || 0) - (res.spent || 0)) * 100) / 100;
   html += '<div class="bal"><span class="cap">Баланс</span><span class="val ' + (bal > 0 ? "plus" : bal < 0 ? "minus" : "") + '">' +
     (bal > 0 ? "+" : bal < 0 ? "−" : "") + esc(fmtEur(Math.abs(bal))) + '</span></div></div>';
-  if (!res.count) { el("statsBody").innerHTML = html + '<p class="muted" style="text-align:center">Операций за этот промежуток нет</p>'; return; }
+  if (!res.count) { el("statsBody").innerHTML = html + '<p class="muted center">Операций за этот промежуток нет</p>'; return; }
   function block(title, key, cls) {
     var list = (res.categories || []).filter(function (c) { return c[key] > 0; }).sort(function (a, b) { return b[key] - a[key]; });
     if (!list.length) return "";
@@ -102,10 +102,12 @@ function renderStats(res) {
       var pct = total > 0 ? c[key] / total * 100 : 0;
       return '<div class="catrow"><div class="top"><span class="nm">' + esc(c.categoryName) + '</span><span class="amt">' + esc(fmtEur(c[key])) +
         '<span class="pct">' + (pct > 0 && pct < 1 ? "&lt;1" : Math.round(pct)) + '%</span></span></div>' +
-        '<div class="bar ' + cls + '"><i style="width:' + Math.max(1, Math.round(c[key] / max * 100)) + '%"></i></div></div>';
+        '<div class="bar ' + cls + '"><i data-w="' + Math.max(1, Math.round(c[key] / max * 100)) + '"></i></div></div>';
     }).join("") + '</div>';
   }
   el("statsBody").innerHTML = html + block("Траты по категориям", "spent", "") + block("Начисления", "income", "inc");
+  // ширина полосок — из кода: style="…" в HTML запрещён защитой страницы (CSP), а свойство элемента — нет
+  [].forEach.call(el("statsBody").querySelectorAll(".bar i[data-w]"), function (b) { b.style.width = b.getAttribute("data-w") + "%"; });
 }
 
 // экраны: add — ввод (основной), history — история, settings — настройки

@@ -70,6 +70,10 @@ button { font-family:inherit; cursor:pointer; }
 .btn:disabled { background:var(--line); color:var(--muted); cursor:default; }
 .btn.saving:disabled { background:var(--accent); color:#fff; opacity:.8; }
 .link { display:block; width:100%; margin-top:6px; padding:8px; border:0; background:transparent; color:var(--muted); font-size:14px; }
+/* вместо style="…" в разметке (их запрещает защита страницы): кнопка-ссылка по ширине текста, текст по центру */
+.link.auto { width:auto; }
+.link.inline { width:auto; margin:0; }
+.center { text-align:center; }
 /* адаптивность: широкий экран (iPad, телефон боком) — шире колонка и 4 категории в ряд;
    самые узкие (320 точек) — шрифт мельче, чтобы длинные названия не переносились.
    Высоту кнопок категорий подбирает fitLayout() под высоту экрана. */
