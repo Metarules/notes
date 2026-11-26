@@ -1,11 +1,11 @@
-// Тема и фон с котиками до отрисовки страницы (подключается в <head>): выбор с этого устройства, иначе — как в системе.
+// Тема и котики в оформлении до отрисовки страницы (подключается в <head>): выбор с этого устройства, иначе — как в системе.
 // Отдельным файлом, потому что встроенные скрипты защита страницы (CSP) запрещает.
 (function () {
   var t = null;
   try { t = localStorage.getItem("theme"); } catch (e) {}
   if (t !== "dark" && t !== "light") t = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   document.documentElement.setAttribute("data-theme", t);
-  var p = null; // фон с котиками — тоже до отрисовки, чтобы не мелькал
+  var p = null; // котики в оформлении (фон и мордочки на ошибках) — тоже до отрисовки, чтобы не мелькали
   try { p = localStorage.getItem("pattern"); } catch (e) {}
-  document.documentElement.setAttribute("data-pattern", p === "off" ? "off" : "on");
+  document.documentElement.setAttribute("data-cats", p === "off" ? "off" : "on");
 })();

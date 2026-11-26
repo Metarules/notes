@@ -120,7 +120,7 @@ var I18N = {
   "stats.spentByCat": { ru: "Траты по категориям", en: "Spending by category", de: "Ausgaben nach Kategorie", sr: "Troškovi po kategorijama", es: "Gastos por categoría" },
 
   "set.lang": { ru: "Язык", en: "Language", de: "Sprache", sr: "Jezik", es: "Idioma" },
-  "set.pattern": { ru: "Фон с котиками", en: "Cat background", de: "Katzen-Hintergrund", sr: "Pozadina sa mačkama", es: "Fondo con gatitos" },
+  "set.pattern": { ru: "Котики в оформлении", en: "Cat decorations", de: "Katzen-Deko", sr: "Mačke u dizajnu", es: "Gatitos decorativos" },
   "set.langAuto": { ru: "Как в системе", en: "System", de: "System", sr: "Kao sistem", es: "Sistema" },
   "set.about": { ru: "О форме", en: "About", de: "Info", sr: "O aplikaciji", es: "Información" },
   "set.pageVer": { ru: "Версия страницы", en: "Page version", de: "Seitenversion", sr: "Verzija stranice", es: "Versión de la página" },

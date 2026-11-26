@@ -12,10 +12,12 @@ button { font-family:inherit; cursor:pointer; }
 input, select, textarea { font-family:inherit; } /* округлый шрифт и в полях */
 /* фон с котиками (вариант B) — фон всего окна (html): он повторяется бесконечно во все стороны и прокручивается
    вместе со страницей, поэтому виден и под плавающей нижней панелью Safari, и за краями при оттягивании страницы.
-   Цвет и бледность заданы в самих картинках (своя для каждой темы); выключается в «Настройках» */
+   Цвет и бледность заданы в самих картинках (своя для каждой темы); выключается в «Настройках» вместе с мордочками */
 html { background-image:url(img/cats-light.svg?v=57); background-size:150px 150px; background-repeat:repeat; }
 html[data-theme="dark"] { background-image:url(img/cats-dark.svg?v=57); }
-html[data-pattern="off"] { background-image:none; }
+/* котики выключены в «Настройках» — нет ни узора, ни мордочек на ошибках */
+html[data-cats="off"] { background-image:none; }
+html[data-cats="off"] .cat-ill, html[data-cats="off"] .nb-cat { display:none !important; }
 /* котик на ошибках (catFace в core.js): линии — приглушённые, слеза — цвет кнопок */
 .cat-ill { display:flex; justify-content:center; color:var(--illus); }
 .cat-ill:empty { display:none; }
@@ -203,7 +205,7 @@ html[data-pattern="off"] { background-image:none; }
 .netbar .nb-title { display:block; font-size:15px; font-weight:600; }
 .netbar .nb-sub { display:block; font-size:13px; opacity:.85; margin-top:1px; }
 /* кнопка — отдельный «пилюлей» с рамкой, чтобы не читалась как продолжение текста */
-.netbar button { flex:0 0 auto; border:1px solid currentColor; border-radius:999px; background:transparent; color:inherit; font-weight:600; font-size:14px; padding:6px 14px; white-space:nowrap; }
+.netbar button { flex:0 0 auto; display:flex; align-items:center; justify-content:center; width:40px; height:40px; border:1.5px solid currentColor; border-radius:50%; background:transparent; color:inherit; padding:0; }
 .netbar button:disabled { opacity:.5; }
 /* траты из очереди на телефоне — в истории сверху, приглушённо */
 .row.queued .tx { opacity:.75; }

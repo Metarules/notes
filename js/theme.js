@@ -85,12 +85,13 @@ function relocalize() {
 
 function toggleTheme() { setTheme(currentTheme() === "dark" ? "light" : "dark"); }
 
-// Фон с котиками: включён, пока его не выключили в «Настройках»; выбор — на этом устройстве ("pattern").
-// Сам узор — фон html в стилях, до отрисовки атрибут ставит theme-init.js.
+// Котики в оформлении — фон с узором и мордочки на ошибках, всё вместе: включены, пока их не выключили
+// в «Настройках»; выбор — на этом устройстве ("pattern"). Само скрытие — в стилях по атрибуту data-cats
+// (до отрисовки его ставит theme-init.js).
 function patternOn() { return store("pattern") !== "off"; }
 function applyPattern() {
   var on = patternOn();
-  document.documentElement.setAttribute("data-pattern", on ? "on" : "off");
+  document.documentElement.setAttribute("data-cats", on ? "on" : "off");
   el("patternSwitch").setAttribute("aria-checked", on ? "true" : "false");
 }
 function togglePattern() { store("pattern", patternOn() ? "off" : null); applyPattern(); }
