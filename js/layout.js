@@ -47,7 +47,7 @@ function fitLayout() {
   // на экране должна помещаться строка «История» под кнопкой (при изменении операции её нет — тогда сама кнопка)
   var anchor = el("navRow").offsetParent ? el("navRow") : el("saveBtn");
   var reserve = fitReserve();
-  function slack() { return window.innerHeight - reserve - (anchor.getBoundingClientRect().bottom + window.pageYOffset); } // минус — не помещается
+  function slack() { return window.innerHeight - reserve - (anchor.getBoundingClientRect().bottom + scrolledBy()); } // минус — не помещается
   var s = slack();
   var sig = [chips.length, window.innerWidth, el("netBar").classList.contains("hidden"), anchor.id].join("|");
   var force = fitForce; fitForce = false;
@@ -112,7 +112,7 @@ window.addEventListener("resize", function () {
   var w = window.innerWidth, hgt = window.innerHeight;
   fitNote("resize");
   if (fitSettling()) { lastSize = { w: w, h: hgt }; scheduleFit(); return; }
-  if (w !== lastSize.w || (window.pageYOffset === 0 && Math.abs(hgt - lastSize.h) > FIT_RESIZE_MIN_PX)) { lastSize = { w: w, h: hgt }; fitForce = true; scheduleFit(); }
+  if (w !== lastSize.w || (scrolledBy() === 0 && Math.abs(hgt - lastSize.h) > FIT_RESIZE_MIN_PX)) { lastSize = { w: w, h: hgt }; fitForce = true; scheduleFit(); }
 });
 // в конце «устаканивания» — последняя сверка (если высота поменялась без события resize)
 setTimeout(function () { fitNote(t("diag.end")); fitForce = true; scheduleFit(); }, FIT_SETTLE_MS);

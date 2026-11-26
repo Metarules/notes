@@ -40,7 +40,7 @@ function showHistPane(p) {
   el("segStats").classList.toggle("on", p === "stats");
   el("paneOps").classList.toggle("hidden", p !== "ops");
   el("paneStats").classList.toggle("hidden", p !== "stats");
-  window.scrollTo(0, 0);
+  scrollToTop();
   if (p === "stats") loadStats(true); else setTimeout(checkMore, 0);
 }
 function setStatsKind(k) {
@@ -215,7 +215,7 @@ function showTab(name) {
   el("histBar").classList.toggle("hidden", !h);
   el("view-settings").classList.toggle("hidden", !st);
   el("setBar").classList.toggle("hidden", !st);
-  window.scrollTo(0, 0);
+  scrollToTop();
   scheduleFit();
   if (h && stats.pane === "stats") loadStats(true); // свежие цифры — могли добавиться операции
   else if (h) setTimeout(checkMore, 0);

@@ -6,12 +6,15 @@
 // Номер релиза страницы = число коммитов index.html на GitHub, включая тот, где он записан
 // (git rev-list --count HEAD -- index.html): +1 при каждом изменении страницы. Виден внизу формы
 // рядом с номером сервера — так понятно, что телефон открыл свежую страницу, а не старую из кэша.
-var PAGE_VERSION = 59;
+var PAGE_VERSION = 60;
 
 var state = { categories: [], currencies: [], merchants: {}, recent: [], prefill: null, editing: null, savedNew: null, sign: -1, categoryId: "", todayKey: "",
   loaded: false, loadError: "", offline: false, touched: false, smsText: "", smsFailShown: false };
 
 function el(id) { return document.getElementById(id); }
+// прокручивается не страница, а область #scroller (см. стили): наверх — её, сколько прокручено — у неё
+function scrollToTop() { el("scroller").scrollTop = 0; }
+function scrolledBy() { return el("scroller").scrollTop; }
 // число из CSS-переменной ("52px", "250ms" → 52, 250): одно значение и для стилей, и для кода
 function cssNum(name, fallback) {
   var v = parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name));

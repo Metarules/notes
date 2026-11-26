@@ -159,7 +159,7 @@ function checkMore() {
   if (!historyVisible()) return;
   if (el("histMore").getBoundingClientRect().top < window.innerHeight * HIST_PRELOAD_SCREENS) loadOlder();
 }
-window.addEventListener("scroll", checkMore, { passive: true });
+el("scroller").addEventListener("scroll", checkMore, { passive: true }); // прокручивается область, не страница
 window.addEventListener("online", function () { setTimeout(checkMore, HIST_ONLINE_DELAY_MS); });
 function canRedrawHistory() { return !state.editing && !swipe.openRow && !swipe.row; }
 function deleteRow(i) {

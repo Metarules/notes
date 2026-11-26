@@ -278,7 +278,7 @@ function startEdit(i) {
   el("editBar").classList.remove("hidden");
   el("view-history").classList.add("hidden");
   el("view-add").classList.remove("hidden");
-  window.scrollTo(0, 0);
+  scrollToTop();
   scheduleFit();
 }
 // Дата и время операции в шапке изменения. Подпись — «25 нояб., 12:00» по правилам языка (год — если не текущий);
