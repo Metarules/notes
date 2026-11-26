@@ -6,7 +6,7 @@
 // Номер релиза страницы = число коммитов index.html на GitHub, включая тот, где он записан
 // (git rev-list --count HEAD -- index.html): +1 при каждом изменении страницы. Виден внизу формы
 // рядом с номером сервера — так понятно, что телефон открыл свежую страницу, а не старую из кэша.
-var PAGE_VERSION = 70;
+var PAGE_VERSION = 71;
 
 var state = { categories: [], currencies: [], merchants: {}, recent: [], prefill: null, editing: null, savedNew: null, sign: -1, categoryId: "", todayKey: "",
   loaded: false, loadError: "", offline: false, touched: false, smsText: "", smsFailShown: false };
@@ -36,30 +36,18 @@ function session(key, value) {
 }
 
 // ---------- виброотклик ----------
-// В iOS Safari нет API вибрации, но системный переключатель <input type=checkbox switch> «тикает» при нажатии —
-// в том числе программном, через его <label>. Невидимый такой переключатель «нажимаем» в момент действия.
-// Работает только в ответ на касание (не на ответ сервера), силу и рисунок не выбрать — только «тик»;
-// n тиков — повтором. На Android — штатный navigator.vibrate. Выключается в «Настройках» («Виброотклик»).
-var HAPTIC_GAP_MS = 110; // между тиками двойного/тройного
-var hapticLabel = null;
+// В iOS Safari нет API вибрации, но системный переключатель <input type=checkbox switch> «тикает», когда его
+// касается палец. Программное нажатие с iOS 26.5 не тикает, поэтому в кнопку с откликом вкладываем невидимый
+// такой переключатель на всю её площадь (HZ, стили .hz): палец попадает на него, iOS тикает, а нажатие
+// всплывает до кнопки и выполняет её действие как обычно. Тик — один на касание; на отпускание после свайпа
+// его не бывает. На Android — штатный navigator.vibrate через haptic(n). Выключается в «Настройках» («Виброотклик»).
+var HZ = '<input type="checkbox" switch class="hz" tabindex="-1" aria-hidden="true">';
+var HAPTIC_GAP_MS = 110; // между вибрациями двойного/тройного на Android
 function hapticsOn() { return store("haptics") !== "off"; }
 function haptic(n) {
-  if (!hapticsOn()) return;
+  if (!hapticsOn() || !navigator.vibrate) return;
   n = n || 1;
-  try {
-    if (navigator.vibrate) { var p = []; for (var i = 0; i < n; i++) p.push(12, HAPTIC_GAP_MS); navigator.vibrate(p.slice(0, -1)); return; }
-    if (!hapticLabel) {
-      hapticLabel = document.createElement("label");
-      hapticLabel.setAttribute("aria-hidden", "true");
-      hapticLabel.style.display = "none";
-      var sw = document.createElement("input");
-      sw.type = "checkbox"; sw.setAttribute("switch", ""); sw.tabIndex = -1;
-      hapticLabel.appendChild(sw);
-      document.head.appendChild(hapticLabel); // в head: нажатие на него не доходит до обработчиков формы
-    }
-    hapticLabel.click();
-    for (var k = 1; k < n; k++) setTimeout(function () { hapticLabel.click(); }, k * HAPTIC_GAP_MS);
-  } catch (e) {}
+  try { var p = []; for (var i = 0; i < n; i++) p.push(12, HAPTIC_GAP_MS); navigator.vibrate(p.slice(0, -1)); } catch (e) {}
 }
 
 // ---------- котик на ошибках ----------
@@ -112,7 +100,7 @@ function setSaving(on) {
   var b = el("saveBtn");
   saving = !!on;
   b.classList.toggle("saving", saving);
-  b.innerHTML = on ? '<span class="mini-spinner"></span>' : esc(t("save"));
+  b.innerHTML = on ? '<span class="mini-spinner"></span>' : esc(t("save")) + HZ;
   updateSaveBtn();
 }
 // «Сохранить» доступна, только когда есть сумма, выбрана категория и загружены справочники

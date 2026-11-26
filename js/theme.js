@@ -100,5 +100,8 @@ function applyPattern() {
 }
 function togglePattern() { store("pattern", patternOn() ? "off" : null); applyPattern(); haptic(1); }
 // Виброотклик (core.js, haptic): включён, пока его не выключили в «Настройках»; выбор — на этом устройстве ("haptics")
-function applyHaptics() { el("hapticsSwitch").setAttribute("aria-checked", hapticsOn() ? "true" : "false"); }
+function applyHaptics() {
+  el("hapticsSwitch").setAttribute("aria-checked", hapticsOn() ? "true" : "false");
+  document.documentElement.setAttribute("data-haptics", hapticsOn() ? "on" : "off"); // выкл. — стили прячут переключатели .hz
+}
 function toggleHaptics() { store("haptics", hapticsOn() ? "off" : null); applyHaptics(); haptic(1); }

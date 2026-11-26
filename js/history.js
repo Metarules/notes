@@ -47,7 +47,7 @@ function endSwipe() {
   swipe.row = null;
   if (!row || !swipe.active) return;
   var open = swipe.x < -REVEAL / 2;
-  if (open && swipe.openRow !== row) haptic(1); // кнопка «Удалить» открылась (тик — когда отпускаешь палец)
+  if (open && swipe.openRow !== row) haptic(1); // кнопка «Удалить» открылась (только Android: в iOS тик бывает лишь от касания переключателя)
   setX(row, open ? -REVEAL : 0, true);
   swipe.openRow = open ? row : null;
 }
@@ -227,7 +227,7 @@ function queuedHtml() {
       : !state.offline ? '<span class="q waiting">' + esc(t("st.queued")) + '</span>'
       : '<span class="q">' + esc(t("st.waitNet")) + '</span>';
     return '<div class="row queued" data-q="' + esc(f.id) + '">' +
-      '<button class="swipe-del">' + esc(t("delete")) + '</button>' +
+      '<button class="swipe-del">' + esc(t("delete")) + HZ + '</button>' +
       '<div class="card tx"><div class="tx-main">' +
         '<div><span class="amount' + (n > 0 ? " pos" : "") + '">' + esc(fmtNum(n)) + " " + esc(f.currencyId) + '</span></div>' +
         '<div class="tx-sub">' + esc(categoryName(f.categoryId) || f.categoryId) + (time ? ' · ' + esc(time) : '') + '</div>' +
@@ -249,7 +249,7 @@ function renderHistory(items) {
     var name = categoryName(r.categoryId) || r.categoryName || t("hist.noCategory"); // перевод — по id категории
     // pending — изменение ещё не подтверждено сервером: карточка приглушена, не нажимается и подписана «сохраняется…»
     html += '<div class="row' + (r.pending ? " saving" : "") + '" data-i="' + i + '">' +
-      '<button class="swipe-del">' + esc(t("delete")) + '</button>' +
+      '<button class="swipe-del">' + esc(t("delete")) + HZ + '</button>' +
       '<div class="card tx">' +
       '<div class="tx-main">' +
         '<div><span class="amount' + (n > 0 ? " pos" : "") + '">' + esc(fmtNum(n)) + " " + esc(r.currencyId) + '</span>' +

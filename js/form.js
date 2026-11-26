@@ -29,7 +29,7 @@ function renderCategories() {
     var n = splitName(categoryLabel(c));
     return '<button class="chip' + (sameId(c.categoryId, state.categoryId) ? " on" : "") + '" data-act="userPickCategory" data-arg="' + i + '">' +
       (n.emo ? '<span class="emo">' + esc(n.emo) + '</span>' : '') +
-      '<span class="name">' + esc(n.label) + '</span></button>';
+      '<span class="name">' + esc(n.label) + '</span>' + HZ + '</button>';
   }).join("");
   updateSaveBtn();
   scheduleFit();
@@ -177,9 +177,9 @@ el("amount").addEventListener("paste", function (e) {
 function readForm() {
   var amount = amountValue();
   // не хватает данных — тройной тик (проверка на телефоне, сразу по нажатию «Сохранить»)
-  if (!amount) { haptic(3); toast(t("form.enterAmount"), true); el("amount").focus(); return null; }
-  if (!state.loaded) { haptic(3); toast(t("form.dictLoading"), true); return null; }
-  if (!state.categoryId) { haptic(3); toast(t("form.pickCategory"), true); return null; }
+  if (!amount) { toast(t("form.enterAmount"), true); el("amount").focus(); return null; }
+  if (!state.loaded) { toast(t("form.dictLoading"), true); return null; }
+  if (!state.categoryId) { toast(t("form.pickCategory"), true); return null; }
   return { amount: state.sign * Math.abs(amount), currencyId: el("currency").value, categoryId: state.categoryId };
 }
 
