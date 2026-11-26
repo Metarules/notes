@@ -13,7 +13,9 @@ button { font-family:inherit; cursor:pointer; }
 input, select, textarea { font-family:inherit; } /* округлый шрифт и в полях */
 /* фон с котиками (вариант B): узор — маска из img/cats.svg, цвет и бледность — из темы; выключается в «Настройках».
    Отдельный неподвижный слой под всем содержимым: при прокрутке не едет и не дёргается на iPhone */
-body::before { content:""; position:fixed; inset:0; z-index:-1; pointer-events:none; background-color:var(--pattern-ink); opacity:var(--pattern-op);
+/* высота — с запасом вниз: в iOS 26 нижняя панель Safari плавает поверх страницы, а «неподвижный» слой
+   заканчивается над ней — без запаса узор обрезался по верхнему краю панели */
+body::before { content:""; position:fixed; left:0; right:0; top:0; height:calc(100vh + 160px); height:calc(100lvh + 160px); z-index:-1; pointer-events:none; background-color:var(--pattern-ink); opacity:var(--pattern-op);
   -webkit-mask-image:url(img/cats.svg?v=51); mask-image:url(img/cats.svg?v=51); -webkit-mask-size:150px 150px; mask-size:150px 150px; -webkit-mask-repeat:repeat; mask-repeat:repeat; }
 html[data-pattern="off"] body::before { display:none; }
 /* котик на ошибках (catFace в core.js): линии — приглушённые, слеза — цвет кнопок */
