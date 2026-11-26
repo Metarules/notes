@@ -92,7 +92,10 @@ function statsKey(r) { return dkey(r.from) + "|" + dkey(r.to); }
 function statsVisible() { return !el("view-history").classList.contains("hidden") && stats.pane === "stats"; }
 
 // общий ответ: loading — идёт запрос; at — когда пришёл последний; err — вид ошибки последнего запроса ("" — не было)
-var statsAll = { loading: false, at: 0, err: "" };
+// keys — промежутки из последнего общего ответа (для «Своих дат», совпавших с одним из них, отдельный запрос не нужен)
+var statsAll = { loading: false, at: 0, err: "", keys: {} };
+// первый день с операциями ("yyyy-MM-dd", приходит в общем ответе): раньше него стрелка ‹ не ведёт
+function statsFirstDay() { return store("statsFirst") || ""; }
 function refreshStatsAll() {
   if (statsAll.loading) return;
   statsAll.loading = true;
@@ -101,10 +104,13 @@ function refreshStatsAll() {
     statsAll.loading = false;
     statsAll.at = Date.now();
     var names = (res && res.names) || {};
+    statsAll.keys = {};
     statsSave(((res && res.periods) || []).map(function (p) {
       (p.categories || []).forEach(function (c) { if (!c.categoryName) c.categoryName = names[c.categoryId] || c.categoryId; });
+      statsAll.keys[p.from + "|" + p.to] = 1;
       return [p.from + "|" + p.to, p];
     }));
+    if (res && res.firstDay) store("statsFirst", res.firstDay);
     if (statsVisible()) loadStats();
   }, function (msg, kind) {
     statsAll.loading = false;
@@ -113,6 +119,14 @@ function refreshStatsAll() {
   });
 }
 
+// После загрузки формы (load в app.js): общий ответ статистики загружаем фоном, чтобы экран статистики
+// открылся уже с готовыми цифрами. Чуть позже — чтобы не мешать отправке только что сохранённой траты.
+var STATS_PRELOAD_DELAY_MS = 2000;
+function preloadStatsAll() {
+  setTimeout(function () {
+    if (!statsAll.at && !statsAll.loading && !state.offline && navigator.onLine !== false) refreshStatsAll();
+  }, STATS_PRELOAD_DELAY_MS);
+}
 // fresh — статистику только что открыли (или нажали «Повторить»): обновляем общий ответ с сервера.
 // Без fresh (‹ ›, смена вида, смена языка) — показываем то, что уже есть, без нового запроса.
 function loadStats(fresh) {
@@ -128,6 +142,8 @@ function loadStats(fresh) {
     r = rangeFor(k, stats.offset);
     el("pLabel").textContent = rangeLabel(k, r);
     el("pNext").disabled = stats.offset >= 0;
+    var first = statsFirstDay();
+    el("pPrev").disabled = !!first && dkey(r.from) <= first; // раньше операций нет — дальше назад листать незачем
   }
   var key = statsKey(r);
   var cached = statsCached(key), seq = ++stats.seq;
@@ -137,7 +153,12 @@ function loadStats(fresh) {
     if (!cached) el("statsBody").innerHTML = '<div class="pending tall"><span class="muted">' + esc(t("stats.waitNet")) + '</span></div>';
     return;
   }
-  if (k === "c") { loadOneStats(key, r, cached, seq); return; }
+  if (k === "c") {
+    // свои даты совпали с промежутком из только что пришедшего общего ответа — цифры уже свежие
+    if (cached && statsAll.at && !statsAll.loading && statsAll.keys[key]) { setStatsSync(""); return; }
+    loadOneStats(key, r, cached, seq);
+    return;
+  }
   if (fresh || (!statsAll.at && !statsAll.err)) refreshStatsAll();
   // общий ответ ещё идёт — когда придёт, loadStats покажет свежие цифры
   if (statsAll.loading) { setStatsSync(cached ? "sync" : ""); return; }

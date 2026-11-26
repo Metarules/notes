@@ -56,6 +56,7 @@ function call(fn, args, onOk, onErr, opts) {
         store("token", null); // ключ не подошёл — забываем его и кэш данных
         store("init", null);
         store("stats", null);
+        store("statsFirst", null);
         noAccess(t("err.noAccess"));
         return;
       }

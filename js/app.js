@@ -13,7 +13,7 @@ function readParams() {
     var newApi = isApiUrl(q.api) && q.api !== store("api") ? q.api : "";
     if (newApi && !q.t) newApi = ""; // адрес без ключа — не меняем
     if (q.t) store("token", q.t);
-    if (newApi) { store("api", newApi); store("init", null); store("stats", null); } // другой сервер — справочники, историю и статистику берём заново с него
+    if (newApi) { store("api", newApi); store("init", null); store("stats", null); store("statsFirst", null); } // другой сервер — справочники, историю и статистику берём заново с него
     if (q.sms) session("sms", q.sms);
     var rest = new URLSearchParams();
     Object.keys(q).forEach(function (k) { if (k !== "t" && k !== "api" && k !== "sms") rest.append(k, q[k]); });
@@ -108,6 +108,7 @@ function load() {
     applyData(data);
     flushOutbox(); // связь есть — отправляем траты, отложенные без связи
     flushCancels(); // и удаляем на сервере то, что удалили, пока оно отправлялось
+    preloadStatsAll(); // и статистику — фоном, чтобы она открылась сразу
   }, function (msg) {
     el("netRetry").disabled = false;
     if (state.loaded) return; // данные из кэша уже на экране; если нет связи — об этом говорит плашка
