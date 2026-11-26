@@ -46,6 +46,10 @@ function showDiag() {
     "ih " + window.innerHeight + " · iw " + window.innerWidth + " · screen " + screen.width + "×" + screen.height + " · dpr " + window.devicePixelRatio,
     "svh " + probe("height:100svh") + " · lvh " + probe("height:100lvh") + " · dvh " + probe("height:100dvh") +
       " · safe↓ " + probe("height:0;padding-bottom:env(safe-area-inset-bottom)") + " · safe↑ " + probe("height:0;padding-top:env(safe-area-inset-top)"),
+    // окно, в котором прокручивается страница: высота html (100%), области прокрутки, видимой части (visualViewport)
+    "html " + document.documentElement.clientHeight + " · scroller " + el("scroller").clientHeight +
+      (window.visualViewport ? " · vv " + Math.round(visualViewport.height) + " (top " + Math.round(visualViewport.offsetTop) + ")" : "") +
+      " · fixed " + probe("top:0;bottom:0;height:auto"),
     t("diag.bottom", { b: Math.round(anchor.getBoundingClientRect().bottom), r: fitReserve(),
       h: document.documentElement.style.getPropertyValue("--chip-h") + (el("catGrid").classList.contains("compact") ? " " + t("diag.compact") : "") }),
     "", t("diag.log")
