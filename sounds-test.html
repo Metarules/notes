@@ -28,27 +28,23 @@ input[type=range] { width:100%; }
 <input type="range" id="vol" min="5" max="100" step="5" value="40" aria-label="Громкость">
 </div>
 
-<h2>Для «Сохранить»</h2>
+<h2>Выбран для «Сохранить»</h2>
 <div class="case">
-<button data-s="register">1. Касса <span>прежний, для сравнения</span></button>
-<button data-s="registerLive">2. Касса, живой звонок <span>мерцающий «дзинь»</span></button>
-<button data-s="registerDrawer">3. Касса с ящиком <span>стук + звонок</span></button>
-<button data-s="kaching">4. «Ка-чинг» <span>два удара звонка</span></button>
-<button data-s="deskBell">5. Звонок на стойке <span>один «дзынь»</span></button>
-<button data-s="coinDrop">6. Монетка <span>упала, подпрыгнула</span></button>
-<button data-s="bill">7. Купюра <span>шелест</span></button>
+<button data-s="save">Касса, живой звонок <span>для сравнения</span></button>
 </div>
 
 <h2>Для «Удалить»</h2>
 <div class="case">
-<button class="del" data-s="drawerClose">A. Ящик задвинули <span>без звонка</span></button>
-<button class="del" data-s="lowBell">B. Низкий «дон» <span>тот же звонок</span></button>
-<button class="del" data-s="crumpleLive">C. Скомкать чек <span>шорох бумаги</span></button>
-<button class="del" data-s="wood">D. Деревянный «ток» <span>коротко</span></button>
+<button class="del" data-s="muted">A. Приглушённый «дзинь» <span>звонок прижали</span></button>
+<button class="del" data-s="downTwo">B. «Дзинь-дон» <span>две ноты вниз</span></button>
+<button class="del" data-s="reverse">C. Звонок наоборот <span>нарастает, обрыв</span></button>
+<button class="del" data-s="key">D. Клавиша кассы <span>щёлк-щёлк</span></button>
+<button class="del" data-s="downThree">E. Три ноты вниз <span>лёгкие</span></button>
+<button class="del" data-s="glass">F. Стеклянный «тинь» <span>тихий</span></button>
+<button class="del" data-s="lowMuted">G. Низкий глухой «дон» <span>коротко</span></button>
 </div>
 
 <p id="log"></p>
-<script src="js/sounds.js?v=2"></script>
-<script src="sounds-test.js?v=2"></script>
+<script src="sounds-test.js?v=3"></script>
 </body>
 </html>
