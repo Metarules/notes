@@ -39,6 +39,53 @@ var T = (function () {
     env(g, t, a || 0.004, peak, d);
     s.connect(bp); bp.connect(g); g.connect(out); s.start(t, Math.random() * 0.5); s.stop(t + d + 0.05);
   }
+  var pinkBuf = null;
+  function pink(c) { // розовый шум (фильтр Пола Келлета): мягче белого, как настоящий шум воздуха
+    if (pinkBuf && pinkBuf.sampleRate === c.sampleRate) return pinkBuf;
+    var b = c.createBuffer(1, c.sampleRate * 2, c.sampleRate), d = b.getChannelData(0);
+    var b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+    for (var i = 0; i < d.length; i++) {
+      var w = Math.random() * 2 - 1;
+      b0 = 0.99886 * b0 + w * 0.0555179; b1 = 0.99332 * b1 + w * 0.0750759; b2 = 0.969 * b2 + w * 0.153852;
+      b3 = 0.8665 * b3 + w * 0.3104856; b4 = 0.55 * b4 + w * 0.5329522; b5 = -0.7616 * b5 - w * 0.016898;
+      d[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.11; b6 = w * 0.115926;
+    }
+    return (pinkBuf = b);
+  }
+  // плавный «горб» громкости: нарастает до доли p длительности и мягко гаснет, без щелчков на краях
+  function hump(p, n) {
+    var a = new Float32Array(n || 64);
+    for (var i = 0; i < a.length; i++) {
+      var x = i / (a.length - 1);
+      a[i] = x < p ? Math.pow(Math.sin(Math.PI / 2 * x / p), 2) : Math.pow(Math.cos(Math.PI / 2 * (x - p) / (1 - p)), 1.6);
+    }
+    return a;
+  }
+  // взмах: розовый шум через полосу, центр которой идёт по точкам fs; o.flutter — дрожание, как у ткани
+  function whoosh(c, out, t, d, fs, peak, o) {
+    o = o || {};
+    var s = c.createBufferSource(), bp = c.createBiquadFilter(), lp = c.createBiquadFilter(), g = c.createGain(), v = c.createGain();
+    s.buffer = pink(c);
+    bp.type = "bandpass"; bp.Q.value = o.q || 0.8;
+    lp.type = "lowpass"; lp.frequency.value = o.lp || 7000;
+    bp.frequency.setValueAtTime(fs[0], t);
+    for (var i = 1; i < fs.length; i++) bp.frequency.exponentialRampToValueAtTime(fs[i], t + d * i / (fs.length - 1));
+    var curve = hump(o.p || 0.4);
+    for (var k = 0; k < curve.length; k++) curve[k] = Math.max(curve[k] * peak, 0.00001);
+    g.gain.setValueAtTime(0.00001, t);
+    g.gain.setValueCurveAtTime(curve, t, d);
+    v.gain.value = 1;
+    if (o.flutter) {
+      var lfo = c.createOscillator(), depth = c.createGain();
+      lfo.frequency.value = o.flutter; depth.gain.value = 0.35;
+      lfo.connect(depth); depth.connect(v.gain); lfo.start(t); lfo.stop(t + d + 0.05);
+    }
+    s.connect(bp); bp.connect(lp); lp.connect(g); g.connect(v); v.connect(out);
+    s.start(t, Math.random()); s.stop(t + d + 0.05);
+  }
+  function grains(c, out, t, d, n, peak) { // редкие бумажные потрескивания поверх взмаха
+    for (var i = 0; i < n; i++) click(c, out, t + d * (0.15 + 0.7 * Math.random()), 0.002 + Math.random() * 0.004, 2000 + Math.random() * 5000, 1.5, peak * (0.3 + 0.7 * Math.random()), 0.0005);
+  }
   var BELL = [[1, 1, 1], [2.32, 0.45, 0.7], [4.25, 0.25, 0.4], [6.63, 0.12, 0.25], [9.38, 0.06, 0.15]];
   var GLASS = [[1, 1, 1], [2.71, 0.3, 0.5], [5.2, 0.1, 0.3]];
   function bell(c, out, t, f, peak, d, parts, noStrike) {
@@ -62,36 +109,28 @@ var T = (function () {
       click(c, o, t + 0.045, 0.025, 2400, 1.5, 0.27);
       bell(c, o, t + 0.08, 2093, 0.24, 0.9);
     },
-    muted: function (c, o, t) { // A. тот же звонок, сразу прижатый ладонью
-      click(c, o, t, 0.01, 5000, 0.8, 0.2, 0.001);
-      bell(c, o, t, 2093, 0.2, 0.13);
+    soft: function (c, o, t) { // A. мягкий взмах: пролетел мимо (высота вверх и вниз)
+      whoosh(c, o, t, 0.3, [700, 2200, 900], 0.9, { p: 0.45 });
     },
-    downTwo: function (c, o, t) { // B. «дзинь-дон» вниз
-      bell(c, o, t, 2093, 0.2, 0.35);
-      bell(c, o, t + 0.12, 1568, 0.2, 0.55, null, true);
+    quick: function (c, o, t) { // B. быстрый лёгкий взмах
+      whoosh(c, o, t, 0.16, [1400, 3800, 2000], 0.8, { p: 0.4, q: 0.9 });
     },
-    reverse: function (c, o, t) { // C. звонок наоборот: нарастает и обрывается
-      revBell(c, o, t, 2093, 0.45, 0.32);
+    down: function (c, o, t) { // C. смахнуть вниз: высота уходит вниз
+      whoosh(c, o, t, 0.28, [3000, 1400, 500], 0.9, { p: 0.3, q: 0.7 });
     },
-    key: function (c, o, t) { // D. клавиша кассы: нажали и отпустили
-      tone(c, o, t, 190, 0.035, 0.38, 120);
-      click(c, o, t, 0.014, 3000, 2, 0.65, 0.001);
-      tone(c, o, t + 0.005, 4600, 0.04, 0.04);
-      click(c, o, t + 0.085, 0.01, 3600, 2, 0.3, 0.001);
-      tone(c, o, t + 0.085, 150, 0.025, 0.15, 110);
+    sheet: function (c, o, t) { // D. листок соскользнул: шорох с бумажной фактурой
+      whoosh(c, o, t, 0.3, [2500, 3500, 1800], 0.75, { p: 0.35, q: 0.6 });
+      grains(c, o, t, 0.3, 18, 0.18);
     },
-    downThree: function (c, o, t) { // E. три лёгкие ноты вниз
-      [[0, 2349, 0.18], [0.075, 1976, 0.16], [0.15, 1568, 0.16]].forEach(function (n, i) {
-        bell(c, o, t + n[0], n[1], n[2], i < 2 ? 0.22 : 0.45, null, i > 0);
-      });
+    air: function (c, o, t) { // E. низкий воздушный «фух»
+      whoosh(c, o, t, 0.34, [450, 1100, 500], 0.9, { p: 0.5, q: 0.6, lp: 3000 });
     },
-    glass: function (c, o, t) { // F. тихий стеклянный «тинь»
-      bell(c, o, t, 1760, 0.19, 0.35, GLASS, true);
-      click(c, o, t, 0.004, 6000, 0.8, 0.15, 0.0008);
+    cloth: function (c, o, t) { // F. взмах с лёгким дрожанием, как ткань
+      whoosh(c, o, t, 0.3, [900, 2400, 1000], 0.9, { p: 0.45, flutter: 28 });
     },
-    lowMuted: function (c, o, t) { // G. низкий приглушённый «дон»
-      bell(c, o, t, 1047, 0.22, 0.18, null, true);
-      click(c, o, t, 0.012, 2500, 0.8, 0.2, 0.001);
+    double: function (c, o, t) { // G. двойной «вжух»
+      whoosh(c, o, t, 0.13, [1200, 3000, 1600], 0.85, { p: 0.4 });
+      whoosh(c, o, t + 0.11, 0.17, [1000, 2600, 1200], 0.65, { p: 0.4 });
     }
   };
   function play(name, vol) {
