@@ -13,9 +13,11 @@ button { font-family:inherit; cursor:pointer; }
 input, select, textarea { font-family:inherit; } /* округлый шрифт и в полях */
 /* фон с котиками (вариант B): узор — маска из img/cats.svg, цвет и бледность — из темы; выключается в «Настройках».
    Отдельный неподвижный слой под всем содержимым: при прокрутке не едет и не дёргается на iPhone */
-/* высота — с запасом вниз: в iOS 26 нижняя панель Safari плавает поверх страницы, а «неподвижный» слой
-   заканчивается над ней — без запаса узор обрезался по верхнему краю панели */
-body::before { content:""; position:fixed; left:0; right:0; top:0; height:calc(100vh + 160px); height:calc(100lvh + 160px); z-index:-1; pointer-events:none; background-color:var(--pattern-ink); opacity:var(--pattern-op);
+/* слой не неподвижный, а во всю высоту страницы и прокручивается вместе с ней: в iOS 26 неподвижные слои
+   обрезаются над плавающей нижней панелью Safari, а обычное содержимое под ней видно; заодно узор не «рябит»
+   за карточками при прокрутке */
+body { position:relative; min-height:100vh; min-height:100lvh; }
+body::before { content:""; position:absolute; left:0; right:0; top:0; bottom:0; z-index:-1; pointer-events:none; background-color:var(--pattern-ink); opacity:var(--pattern-op);
   -webkit-mask-image:url(img/cats.svg?v=51); mask-image:url(img/cats.svg?v=51); -webkit-mask-size:150px 150px; mask-size:150px 150px; -webkit-mask-repeat:repeat; mask-repeat:repeat; }
 html[data-pattern="off"] body::before { display:none; }
 /* котик на ошибках (catFace в core.js): линии — приглушённые, слеза — цвет кнопок */
@@ -171,11 +173,11 @@ html[data-pattern="off"] body::before { display:none; }
 /* строка истории: карточка сдвигается свайпом влево и открывает кнопку «Удалить» */
 .row { position:relative; margin-bottom:10px; border-radius:14px; overflow:hidden; }
 /* операции одного дня — одна общая карточка (подложка): узор с котиками виден только между днями и не рябит при прокрутке.
-   Строки внутри — без своих скруглений и теней, между ними тонкая линия с отступом слева, как в списках iOS */
+   Строки внутри — без своих скруглений и теней, между ними тонкая линия с отступами по краям */
 .daygroup { background:var(--card); border-radius:14px; overflow:hidden; box-shadow:0 1px 2px var(--shadow); margin-bottom:10px; }
 .daygroup .row { margin-bottom:0; border-radius:0; }
 .daygroup .row .tx { border-radius:0; box-shadow:none; }
-.daygroup .row + .row::after { content:""; position:absolute; top:0; left:16px; right:0; height:1px; background:var(--line); z-index:2; pointer-events:none; }
+.daygroup .row + .row::after { content:""; position:absolute; top:0; left:16px; right:16px; height:1px; background:var(--line); z-index:2; pointer-events:none; }
 .row .card { margin-bottom:0; }
 .tx { position:relative; z-index:1; display:flex; align-items:center; gap:8px; padding:14px 16px; touch-action:pan-y; transition:transform var(--swipe-ms) ease; will-change:transform; }
 .swipe-del { position:absolute; top:0; right:0; bottom:0; width:96px; padding-left:8px; border:0; background:var(--danger); color:#fff; font-size:15px; visibility:hidden; }
