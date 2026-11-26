@@ -19,7 +19,9 @@ body { height:100%; height:100lvh; }
 /* фон с котиками (вариант B) — у самой прокручиваемой области и неподвижен, как обои чата: карточки едут поверх.
    Один слой узора — нигде не обрывается (он во весь экран, в том числе под панелями Safari) и не двоится,
    в том числе когда содержимое пружинит у края. Цвет и бледность заданы в самих картинках (своя для каждой темы) */
-.scroller { background-color:var(--bg); background-image:url(img/cats-light.svg?v=57); background-size:150px 150px; background-repeat:repeat; }
+/* по ширине — целое число плиток (round: плитка чуть сжимается или растягивается под ширину экрана, пропорционально),
+   поэтому у правого края нет обрезков котиков; по высоте — как есть */
+.scroller { background-color:var(--bg); background-image:url(img/cats-light.svg?v=57); background-size:150px auto; background-repeat:round repeat; }
 .scroll-bg { min-height:100%; }
 html[data-theme="dark"] .scroller { background-image:url(img/cats-dark.svg?v=57); }
 /* котики выключены в «Настройках» — нет ни узора, ни мордочек на ошибках */
