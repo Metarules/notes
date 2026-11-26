@@ -14,18 +14,21 @@ input, select, textarea { font-family:inherit; } /* округлый шрифт 
    Сама страница всегда стоит в начале: в iOS 26 под плавающей нижней панелью рисуется только то, что есть на странице,
    и прокрученная до конца страница оставляла там пустую полосу цвета фона. */
 html { height:100%; overflow:hidden; overscroll-behavior:none; }
-body { height:100%; height:100lvh; }
+/* высота области — ровно видимое окно (100%), а не «большое» 100lvh: в окне шортката 100lvh выше видимого,
+   и низ страницы при полной прокрутке уезжал под панель Safari. Если окно кончается над панелью, под ней
+   продолжается тот же неподвижный узор фона страницы (html) — он совпадает с узором области */
+body { height:100%; }
 .scroller { height:100%; overflow-x:hidden; overflow-y:auto; -webkit-overflow-scrolling:touch; }
 /* фон с котиками (вариант B) — у самой прокручиваемой области и неподвижен, как обои чата: карточки едут поверх.
    Один слой узора — нигде не обрывается (он во весь экран, в том числе под панелями Safari) и не двоится,
    в том числе когда содержимое пружинит у края. Цвет и бледность заданы в самих картинках (своя для каждой темы) */
 /* по ширине — целое число плиток (round: плитка чуть сжимается или растягивается под ширину экрана, пропорционально),
    поэтому у правого края нет обрезков котиков; по высоте — как есть */
-.scroller { background-color:var(--bg); background-image:url(img/cats-light.svg?v=57); background-size:150px auto; background-repeat:round repeat; }
+html, .scroller { background-color:var(--bg); background-image:url(img/cats-light.svg?v=57); background-size:150px auto; background-repeat:round repeat; }
 .scroll-bg { min-height:100%; }
-html[data-theme="dark"] .scroller { background-image:url(img/cats-dark.svg?v=57); }
+html[data-theme="dark"], html[data-theme="dark"] .scroller { background-image:url(img/cats-dark.svg?v=57); }
 /* котики выключены в «Настройках» — нет ни узора, ни мордочек на ошибках */
-html[data-cats="off"] .scroller { background-image:none; }
+html[data-cats="off"], html[data-cats="off"] .scroller { background-image:none; }
 html[data-cats="off"] .cat-ill, html[data-cats="off"] .nb-cat { display:none !important; }
 /* котик на ошибках (catFace в core.js): линии — приглушённые, слеза — цвет кнопок */
 .cat-ill { display:flex; justify-content:center; color:var(--illus); }
