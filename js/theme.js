@@ -105,3 +105,6 @@ function applyHaptics() {
   document.documentElement.setAttribute("data-haptics", hapticsOn() ? "on" : "off"); // выкл. — стили прячут переключатели .hz
 }
 function toggleHaptics() { store("haptics", hapticsOn() ? "off" : null); applyHaptics(); haptic(1); }
+// Звуки (sounds.js): включены, пока их не выключили; при включении — один раз звук «Сохранить» для примера
+function applySounds() { el("soundsSwitch").setAttribute("aria-checked", Snd.on() ? "true" : "false"); }
+function toggleSounds() { store("sounds", Snd.on() ? "off" : null); applySounds(); haptic(1); if (Snd.on()) Snd.save(true); }

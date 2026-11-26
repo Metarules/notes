@@ -139,6 +139,7 @@ window.addEventListener("hashchange", function () { location.reload(); });
 applyTheme();
 applyPattern();
 applyHaptics();
+applySounds();
 applyStaticI18n();
 renderLangSelect();
 setSaving(false);

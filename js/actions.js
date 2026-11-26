@@ -14,6 +14,7 @@ var ACTIONS = {
   toggleTheme: function () { toggleTheme(); },
   togglePattern: function () { togglePattern(); },
   toggleHaptics: function () { toggleHaptics(); },
+  toggleSounds: function () { toggleSounds(); },
   openDiag: function () { openDiag(); },
   showHistPane: function (a) { showHistPane(a); },
   retryOlder: function () { retryOlder(); },

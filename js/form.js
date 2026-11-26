@@ -195,6 +195,7 @@ function save() {
   if (!form) return;
   haptic(1); // «Сохранить» нажато, данные в порядке
   if (state.editing && navigator.onLine === false) { toast(t("form.noNetEdit"), false, TOAST_LONG_MS); return; }
+  Snd.save(); // касса — только когда запись правда уходит
   setSaving(true);
   if (state.editing) {
     var ed = state.editing;
