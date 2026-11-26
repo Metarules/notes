@@ -86,6 +86,14 @@ var T = (function () {
     });
     s.start(t, Math.random() * 0.5); s.stop(t + 0.05);
   }
+  // мягкий щелчок: розовый шум, полоса f, срез верха lp, атака a
+  function softClick(c, out, t, d, f, q, peak, a, lp) {
+    var s = c.createBufferSource(), bp = c.createBiquadFilter(), l = c.createBiquadFilter(), g = c.createGain();
+    s.buffer = pink(c); bp.type = "bandpass"; bp.Q.value = q; bp.frequency.value = f;
+    l.type = "lowpass"; l.frequency.value = lp;
+    env(g, t, a, peak, d);
+    s.connect(bp); bp.connect(l); l.connect(g); g.connect(out); s.start(t, Math.random()); s.stop(t + d + 0.05);
+  }
   // россыпь крошечных щелчков; shape > 1 — плотнее к концу, < 1 — к началу
   function grains(c, out, t, d, n, peak, fLo, fHi, shape) {
     for (var i = 0; i < n; i++) {
@@ -100,25 +108,24 @@ var T = (function () {
     eraser4: function (c, o, t) { // ластик: одно мягкое движение (для сравнения)
       whoosh(c, o, t, 0.14, [800, 1200, 850], 0.85, 0.45, 1.1, 2400);
     },
-    tap1: function (c, o, t) { // 1. щелчок из звука кассы
+    tap1: function (c, o, t) { // 1. щелчок кассы как есть (для сравнения)
       click(c, o, t, 0.03, 1800, 1.2, 0.45);
     },
-    tap2: function (c, o, t) { // 2. крошечный «тинь» того же колокольчика
-      bell(c, o, t, 2093, 0.07, 0.16);
+    soft2: function (c, o, t) { // 2. ниже, со срезанным верхом
+      softClick(c, o, t, 0.03, 1300, 1, 1.1, 0.002, 3000);
     },
-    tap3: function (c, o, t) { // 3. касание бумаги — миниатюра ластика
-      whoosh(c, o, t, 0.045, [900, 1400, 950], 0.6, 0.3, 1.1, 2500);
+    soft3: function (c, o, t) { // 3. ещё мягче и глуше
+      softClick(c, o, t, 0.032, 950, 0.9, 1.05, 0.003, 2000);
     },
-    tap4: function (c, o, t) { // 4. стук пальцем по дереву
-      knock(c, o, t, [[520, 25, 1], [1380, 30, 0.45], [2350, 35, 0.2]], 3.6);
+    soft4: function (c, o, t) { // 4. короче и легче
+      softClick(c, o, t, 0.016, 1500, 1, 1.3, 0.0015, 3200);
     },
-    tap5: function (c, o, t) { // 5. костяшкой по столу — ниже и глуше
-      knock(c, o, t, [[190, 12, 1], [430, 18, 0.5], [950, 25, 0.2]], 6, 0.004);
-      click(c, o, t, 0.004, 2500, 0.8, 0.05, 0.0008);
+    soft5: function (c, o, t) { // 5. мягкий двойной, как в кассе
+      softClick(c, o, t, 0.022, 1200, 1, 1.3, 0.002, 2800);
+      softClick(c, o, t + 0.035, 0.018, 1550, 1, 0.75, 0.002, 3000);
     },
-    tap6: function (c, o, t) { // 6. маленькая касса: щелчок и едва слышный «тинь»
-      click(c, o, t, 0.025, 1800, 1.2, 0.38);
-      bell(c, o, t + 0.035, 2093, 0.06, 0.14);
+    soft6: function (c, o, t) { // 6. совсем бархатный: низкий, с плавным началом
+      softClick(c, o, t, 0.035, 750, 0.8, 1.5, 0.005, 1500);
     }
   };
   function play(name, vol) {
