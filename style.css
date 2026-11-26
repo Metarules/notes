@@ -16,8 +16,11 @@ input, select, textarea { font-family:inherit; } /* округлый шрифт 
 /* слой не неподвижный, а во всю высоту страницы и прокручивается вместе с ней: в iOS 26 неподвижные слои
    обрезаются над плавающей нижней панелью Safari, а обычное содержимое под ней видно; заодно узор не «рябит»
    за карточками при прокрутке */
+/* при оттягивании страницы за край (пружина iOS) за краем видна пустота без узора: пружину выключаем,
+   а сверху слой ещё и выходит за край страницы — на случай, если браузер всё же оттянет */
+html { overscroll-behavior-y:none; }
 body { position:relative; min-height:100vh; min-height:100lvh; }
-body::before { content:""; position:absolute; left:0; right:0; top:0; bottom:0; z-index:-1; pointer-events:none; background-color:var(--pattern-ink); opacity:var(--pattern-op);
+body::before { content:""; position:absolute; left:0; right:0; top:-400px; bottom:0; z-index:-1; pointer-events:none; background-color:var(--pattern-ink); opacity:var(--pattern-op);
   -webkit-mask-image:url(img/cats.svg?v=51); mask-image:url(img/cats.svg?v=51); -webkit-mask-size:150px 150px; mask-size:150px 150px; -webkit-mask-repeat:repeat; mask-repeat:repeat; }
 html[data-pattern="off"] body::before { display:none; }
 /* котик на ошибках (catFace в core.js): линии — приглушённые, слеза — цвет кнопок */
