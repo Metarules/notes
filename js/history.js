@@ -216,7 +216,7 @@ function dayHead(key) {
 function queuedHtml() {
   var l = outbox();
   if (!l.length) return "";
-  return '<div class="day"><span>' + esc(t("hist.waiting")) + '</span></div>' + l.map(function (x) {
+  return '<div class="day"><span>' + esc(t("hist.waiting")) + '</span></div><div class="daygroup">' + l.map(function (x) {
     var f = x.form, n = Number(f.amount);
     var at = f.at ? new Date(f.at) : null;
     var time = at && isFinite(at.getTime()) ? at.toLocaleString(locale(), { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
@@ -232,7 +232,7 @@ function queuedHtml() {
         '<div class="tx-sub">' + esc(categoryName(f.categoryId) || f.categoryId) + (time ? ' · ' + esc(time) : '') + '</div>' +
         '<div class="tx-sub tx-status">' + status + '</div>' +
       '</div></div></div>';
-  }).join("");
+  }).join("") + '</div>';
 }
 function renderHistory(items) {
   swipe.openRow = null;
@@ -243,7 +243,7 @@ function renderHistory(items) {
   var gone = cancels();
   state.recent.forEach(function (r, i) {
     if (r.id && gone.indexOf(r.id) > -1) return; // удалена, сервер ещё не подтвердил
-    if (r.dayKey !== lastDay) { html += dayHead(r.dayKey); lastDay = r.dayKey; }
+    if (r.dayKey !== lastDay) { html += (lastDay !== null ? '</div>' : '') + dayHead(r.dayKey) + '<div class="daygroup">'; lastDay = r.dayKey; }
     var n = Number(r.amount);
     var name = categoryName(r.categoryId) || r.categoryName || t("hist.noCategory"); // перевод — по id категории
     // pending — изменение ещё не подтверждено сервером: карточка приглушена, не нажимается и подписана «сохраняется…»
@@ -258,6 +258,7 @@ function renderHistory(items) {
       '</div>' +
       '</div></div>';
   });
+  if (lastDay !== null) html += '</div>'; // закрываем карточку последнего дня
   el("historyList").innerHTML = html || '<p class="muted">' + esc(t("hist.empty")) + '</p>';
   renderMore();
   setTimeout(checkMore, 0);
