@@ -35,7 +35,7 @@ function renderCategories() {
   scheduleFit();
 }
 function pickCategory(id) { state.categoryId = id; renderCategories(); }
-function userPickCategory(i) { var c = state.categories[i]; if (!c) return; pickCategory(c.categoryId); formChanged(true); }
+function userPickCategory(i) { var c = state.categories[i]; if (!c) return; haptic(1); pickCategory(c.categoryId); formChanged(true); }
 // id категорий сравниваем как текст: из разных мест (таблица, магазины) он может прийти числом или строкой
 function sameId(a, b) { return String(a == null ? "" : a) === String(b == null ? "" : b) && a !== "" && a != null; }
 // Название категории на языке страницы: перевод из столбца en/de/sr/es листа Categories, а нет его — основное.
@@ -176,9 +176,10 @@ el("amount").addEventListener("paste", function (e) {
 
 function readForm() {
   var amount = amountValue();
-  if (!amount) { toast(t("form.enterAmount"), true); el("amount").focus(); return null; }
-  if (!state.loaded) { toast(t("form.dictLoading"), true); return null; }
-  if (!state.categoryId) { toast(t("form.pickCategory"), true); return null; }
+  // не хватает данных — тройной тик (проверка на телефоне, сразу по нажатию «Сохранить»)
+  if (!amount) { haptic(3); toast(t("form.enterAmount"), true); el("amount").focus(); return null; }
+  if (!state.loaded) { haptic(3); toast(t("form.dictLoading"), true); return null; }
+  if (!state.categoryId) { haptic(3); toast(t("form.pickCategory"), true); return null; }
   return { amount: state.sign * Math.abs(amount), currencyId: el("currency").value, categoryId: state.categoryId };
 }
 
@@ -192,6 +193,7 @@ function savedText(form) {
 function save() {
   var form = readForm();
   if (!form) return;
+  haptic(1); // «Сохранить» нажато, данные в порядке
   if (state.editing && navigator.onLine === false) { toast(t("form.noNetEdit"), false, TOAST_LONG_MS); return; }
   setSaving(true);
   if (state.editing) {

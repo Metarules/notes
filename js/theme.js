@@ -98,4 +98,7 @@ function applyPattern() {
   document.documentElement.setAttribute("data-cats", on ? "on" : "off");
   el("patternSwitch").setAttribute("aria-checked", on ? "true" : "false");
 }
-function togglePattern() { store("pattern", patternOn() ? "off" : null); applyPattern(); }
+function togglePattern() { store("pattern", patternOn() ? "off" : null); applyPattern(); haptic(1); }
+// Виброотклик (core.js, haptic): включён, пока его не выключили в «Настройках»; выбор — на этом устройстве ("haptics")
+function applyHaptics() { el("hapticsSwitch").setAttribute("aria-checked", hapticsOn() ? "true" : "false"); }
+function toggleHaptics() { store("haptics", hapticsOn() ? "off" : null); applyHaptics(); haptic(1); }

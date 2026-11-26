@@ -6,7 +6,7 @@
 // Номер релиза страницы = число коммитов index.html на GitHub, включая тот, где он записан
 // (git rev-list --count HEAD -- index.html): +1 при каждом изменении страницы. Виден внизу формы
 // рядом с номером сервера — так понятно, что телефон открыл свежую страницу, а не старую из кэша.
-var PAGE_VERSION = 69;
+var PAGE_VERSION = 70;
 
 var state = { categories: [], currencies: [], merchants: {}, recent: [], prefill: null, editing: null, savedNew: null, sign: -1, categoryId: "", todayKey: "",
   loaded: false, loadError: "", offline: false, touched: false, smsText: "", smsFailShown: false };
@@ -33,6 +33,33 @@ function session(key, value) {
     if (value === undefined) return sessionStorage.getItem(key);
     if (value === null) sessionStorage.removeItem(key); else sessionStorage.setItem(key, value);
   } catch (e) { return null; }
+}
+
+// ---------- виброотклик ----------
+// В iOS Safari нет API вибрации, но системный переключатель <input type=checkbox switch> «тикает» при нажатии —
+// в том числе программном, через его <label>. Невидимый такой переключатель «нажимаем» в момент действия.
+// Работает только в ответ на касание (не на ответ сервера), силу и рисунок не выбрать — только «тик»;
+// n тиков — повтором. На Android — штатный navigator.vibrate. Выключается в «Настройках» («Виброотклик»).
+var HAPTIC_GAP_MS = 110; // между тиками двойного/тройного
+var hapticLabel = null;
+function hapticsOn() { return store("haptics") !== "off"; }
+function haptic(n) {
+  if (!hapticsOn()) return;
+  n = n || 1;
+  try {
+    if (navigator.vibrate) { var p = []; for (var i = 0; i < n; i++) p.push(12, HAPTIC_GAP_MS); navigator.vibrate(p.slice(0, -1)); return; }
+    if (!hapticLabel) {
+      hapticLabel = document.createElement("label");
+      hapticLabel.setAttribute("aria-hidden", "true");
+      hapticLabel.style.display = "none";
+      var sw = document.createElement("input");
+      sw.type = "checkbox"; sw.setAttribute("switch", ""); sw.tabIndex = -1;
+      hapticLabel.appendChild(sw);
+      document.head.appendChild(hapticLabel); // в head: нажатие на него не доходит до обработчиков формы
+    }
+    hapticLabel.click();
+    for (var k = 1; k < n; k++) setTimeout(function () { hapticLabel.click(); }, k * HAPTIC_GAP_MS);
+  } catch (e) {}
 }
 
 // ---------- котик на ошибках ----------

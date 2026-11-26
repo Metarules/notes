@@ -121,6 +121,7 @@ var I18N = {
 
   "set.lang": { ru: "Язык", en: "Language", de: "Sprache", sr: "Jezik", es: "Idioma" },
   "set.pattern": { ru: "Котики в оформлении", en: "Cat decorations", de: "Katzen-Deko", sr: "Mačke u dizajnu", es: "Gatitos decorativos" },
+  "set.haptics": { ru: "Виброотклик", en: "Haptic feedback", de: "Haptisches Feedback", sr: "Haptički odziv", es: "Respuesta háptica" },
   "set.langAuto": { ru: "Как в системе", en: "System", de: "System", sr: "Kao sistem", es: "Sistema" },
   "set.about": { ru: "О форме", en: "About", de: "Info", sr: "O aplikaciji", es: "Información" },
   "set.pageVer": { ru: "Версия страницы", en: "Page version", de: "Seitenversion", sr: "Verzija stranice", es: "Versión de la página" },

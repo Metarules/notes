@@ -13,6 +13,7 @@ var ACTIONS = {
   userPickCategory: function (a) { userPickCategory(Number(a)); },
   toggleTheme: function () { toggleTheme(); },
   togglePattern: function () { togglePattern(); },
+  toggleHaptics: function () { toggleHaptics(); },
   openDiag: function () { openDiag(); },
   showHistPane: function (a) { showHistPane(a); },
   retryOlder: function () { retryOlder(); },

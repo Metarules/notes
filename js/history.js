@@ -47,6 +47,7 @@ function endSwipe() {
   swipe.row = null;
   if (!row || !swipe.active) return;
   var open = swipe.x < -REVEAL / 2;
+  if (open && swipe.openRow !== row) haptic(1); // кнопка «Удалить» открылась (тик — когда отпускаешь палец)
   setX(row, open ? -REVEAL : 0, true);
   swipe.openRow = open ? row : null;
 }
@@ -58,13 +59,13 @@ list.addEventListener("click", function (e) {
   if (!row) return;
   var qid = row.getAttribute("data-q");
   if (qid) { // трата из очереди: свайп «Удалить» убирает её с телефона, касание ничего не делает
-    if (e.target.closest(".swipe-del")) dropQueued(qid);
+    if (e.target.closest(".swipe-del")) { haptic(1); dropQueued(qid); }
     else if (swipe.openRow) closeOpenRow();
     else toast(t(sendingIds.indexOf(qid) > -1 ? "q.sending" : state.offline ? "q.waitNet" : "q.queued"));
     return;
   }
   var i = Number(row.getAttribute("data-i"));
-  if (e.target.closest(".swipe-del")) { deleteRow(i); return; }
+  if (e.target.closest(".swipe-del")) { haptic(1); deleteRow(i); return; }
   if (swipe.openRow) { closeOpenRow(); return; }
   startEdit(i);
 });
