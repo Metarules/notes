@@ -64,10 +64,22 @@ function renderCurrencies(selected) {
 }
 
 // ---------- выбор валюты: крупная панель вместо системного списка ----------
+// флаг валюты: по ISO 4217 первые две буквы кода — код страны (RSD → RS, EUR → EU).
+// Коды на X (металлы, СДР) и криптовалюты из CUR_NO_FLAG — без флага, чтобы не показать чужую страну.
+var CUR_NO_FLAG = ["BTC", "ETH", "LTC", "SOL", "TON", "USDT", "USDC"];
+function curFlag(c) {
+  c = String(c || "").toUpperCase();
+  if (!/^[A-Z]{3}$/.test(c) || c.charAt(0) === "X" || CUR_NO_FLAG.indexOf(c) > -1) return "";
+  return String.fromCodePoint(0x1F1E6 + c.charCodeAt(0) - 65, 0x1F1E6 + c.charCodeAt(1) - 65);
+}
+function curFlagHtml(c) {
+  var f = curFlag(c);
+  return f ? '<span class="flag" aria-hidden="true">' + f + '</span>' : "";
+}
 // Значение хранится в скрытом <select id="currency"> — остальной код читает его как раньше.
 function syncCurBtn() {
   var sel = el("currency"), b = el("curBtn");
-  b.innerHTML = sel.disabled || !sel.value ? "…" : esc(sel.value) + '<svg class="caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
+  b.innerHTML = sel.disabled || !sel.value ? "…" : curFlagHtml(sel.value) + esc(sel.value) + '<svg class="caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
   b.disabled = sel.disabled;
 }
 function setCurrency(c) {
@@ -87,7 +99,7 @@ function toggleCurPanel() {
     var on = c === cur;
     return '<button role="menuitemradio" aria-checked="' + on + '" class="' + (on ? "on" : "") + '" data-act="pickCurrency" data-arg="' + i + '">' +
       '<span class="check" aria-hidden="true">' + (on ? "✓" : "") + '</span>' +
-      '<span class="code">' + esc(c) + '</span></button>';
+      curFlagHtml(c) + '<span class="code">' + esc(c) + '</span></button>';
   }).join("");
   p.classList.remove("hidden");
   el("curBtn").setAttribute("aria-expanded", "true");
