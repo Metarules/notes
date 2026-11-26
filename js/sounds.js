@@ -1,11 +1,14 @@
 // Звуки действий: «Сохранить» — касса (щелчок и «живой» колокольчик); свайп, открывший «Удалить», —
-// мягкий короткий взмах; остальные нажатия (Snd.tap: «Удалить», категории, вкладки и периоды статистики,
-// тумблеры настроек) — мягкий двойной щелчок, как в начале кассы.
+// мягкий короткий взмах; остальные нажатия кнопок (Snd.tap; общий обработчик в actions.js, «Удалить»,
+// операция в истории) — мягкий двойной щелчок, как в начале кассы.
 // Синтезируются Web Audio прямо здесь, без файлов. Тихие и короткие; режим тишины iPhone (Silent mode)
 // их глушит, музыку и подкасты они не прерывают: сеанс звука страницы — «ambient» (navigator.audioSession,
 // Safari 16.4+). Звучат только в ответ на касание: иначе iOS не даст.
 // Выключаются в «Настройках» («Звуки»); выбор — на этом устройстве ("sounds").
 var SOUND_VOLUME = 0.4;        // общая громкость (как на странице проверки по умолчанию)
+// множители громкости: звуки выровнены по кассе на слух — по модели громкости с суммированием по критическим
+// полосам (как у Цвикера): широкий шум взмаха ухо слышит громче чистого тона той же энергии
+var SOUND_LEVELS = { save: 1, swipe: 0.25, tap: 8.3 };
 var SOUND_IDLE_MS = 30000;     // после тишины аудио засыпает, чтобы не держать динамик и батарею;
                                // не сразу: свайп разбудить его может не всегда, а по касанию он сработает
 var Snd = (function () {
@@ -123,20 +126,23 @@ var Snd = (function () {
     idle = setTimeout(function () { try { ctx.suspend(); } catch (e) {} }, SOUND_IDLE_MS);
   }
   // вызывать из обработчика касания: iOS разрешает звук только так; force — проиграть, даже если выключено
-  function play(fn, force) {
+  function play(fn, level, force) {
     if (!force && !on()) return;
     try {
       if (!setup()) return;
       clearTimeout(idle);
       if (ctx.state !== "running") ctx.resume();
-      fn(ctx, master, ctx.currentTime + 0.01);
+      var g = ctx.createGain();
+      g.gain.value = level;
+      g.connect(master);
+      fn(ctx, g, ctx.currentTime + 0.01);
       sleepLater();
     } catch (e) {}
   }
   return {
     on: on,
-    save: function (force) { play(register, force); },
-    swipe: function () { play(swoosh); },
-    tap: function () { play(tick); }
+    save: function (force) { play(register, SOUND_LEVELS.save, force); },
+    swipe: function () { play(swoosh, SOUND_LEVELS.swipe); },
+    tap: function () { play(tick, SOUND_LEVELS.tap); }
   };
 })();

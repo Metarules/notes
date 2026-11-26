@@ -67,6 +67,7 @@ list.addEventListener("click", function (e) {
   var i = Number(row.getAttribute("data-i"));
   if (e.target.closest(".swipe-del")) { haptic(1); Snd.tap(); deleteRow(i); return; }
   if (swipe.openRow) { closeOpenRow(); return; }
+  Snd.tap(); // открыть операцию на правку
   startEdit(i);
 });
 // Карточка исчезает сразу, запрос уходит фоном. Можно удалять несколько подряд, не дожидаясь ответов:

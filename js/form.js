@@ -310,6 +310,7 @@ el("editWhenInput").addEventListener("change", function () {
 });
 // на компьютере прозрачное поле само открывает выбор только со значка — открываем сразу; на iPhone окно открывается по нажатию
 el("editWhenInput").addEventListener("click", function () {
+  Snd.tap();
   try { if (window.matchMedia && matchMedia("(pointer: fine)").matches && this.showPicker) this.showPicker(); } catch (x) {}
 });
 
