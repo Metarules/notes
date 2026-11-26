@@ -54,6 +54,7 @@ function call(fn, args, onOk, onErr, opts) {
       if (res && res.auth === false) {
         store("token", null); // ключ не подошёл — забываем его и кэш данных
         store("init", null);
+        store("stats", null);
         noAccess(t("err.noAccess"));
         return;
       }

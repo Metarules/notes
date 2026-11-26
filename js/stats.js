@@ -57,6 +57,34 @@ function updateKindLabel() {
   var n = periodStartDay();
   el("kindSeg").querySelector('[data-k="p"]').textContent = t("kind.p", { n: n, nth: ordinalEn(n) });
 }
+// ---------- сохранённые цифры статистики ----------
+// Ответы сервера по каждому промежутку хранятся и на телефоне ("stats"): статистика открывается сразу
+// с сохранёнными цифрами, а свежие приходят фоном и тихо их заменяют (строка «Обновляется…» под периодом).
+var STATS_KEEP = 40; // сколько промежутков помним на телефоне (самые свежие по времени ответа)
+function statsStore() { try { var o = JSON.parse(store("stats") || "{}"); return o && typeof o === "object" ? o : {}; } catch (e) { return {}; } }
+function statsCached(key) {
+  if (!stats.cache[key]) { var o = statsStore()[key]; if (o && o.r) stats.cache[key] = o.r; }
+  return stats.cache[key] || null;
+}
+function statsSave(key, res) {
+  stats.cache[key] = res;
+  var o = statsStore();
+  o[key] = { r: res, at: Date.now() };
+  var keys = Object.keys(o).sort(function (a, b) { return (o[b].at || 0) - (o[a].at || 0); });
+  keys.slice(STATS_KEEP).forEach(function (k) { delete o[k]; });
+  try { store("stats", JSON.stringify(o)); } catch (e) {}
+}
+// строка под периодом: "sync" — идёт обновление, "stale" / "staleOffline" — показаны сохранённые, обновить не вышло; "" — пусто.
+// Место под строку есть всегда — цифры ниже не прыгают, когда она появляется и исчезает.
+function setStatsSync(mode) {
+  var b = el("statsSync");
+  b.className = "stats-sync" + (mode === "sync" ? " on" : "");
+  if (mode === "sync") b.innerHTML = '<span class="q-spin"></span>' + esc(t("stats.syncing"));
+  else if (mode === "stale") b.innerHTML = esc(t("stats.stale")) + ' <button class="link inline" data-act="loadStats">' + esc(t("retry")) + '</button>';
+  else if (mode === "staleOffline") b.textContent = t("stats.staleOffline");
+  else b.textContent = "";
+}
+function statsKey(r) { return dkey(r.from) + "|" + dkey(r.to); }
 function loadStats() {
   var k = stats.kind, r;
   updateKindLabel();
@@ -65,28 +93,43 @@ function loadStats() {
   el("pDates").classList.toggle("hidden", k !== "c");
   if (k === "c") {
     r = { from: fromKey(el("dFrom").value), to: fromKey(el("dTo").value) };
-    if (!r.from || !r.to || r.from > r.to) { el("statsBody").innerHTML = '<p class="muted center">' + esc(t("stats.datesInvalid")) + '</p>'; return; }
+    if (!r.from || !r.to || r.from > r.to) { setStatsSync(""); el("statsBody").innerHTML = '<p class="muted center">' + esc(t("stats.datesInvalid")) + '</p>'; return; }
   } else {
     r = rangeFor(k, stats.offset);
     el("pLabel").textContent = rangeLabel(k, r);
     el("pNext").disabled = stats.offset >= 0;
   }
-  var key = dkey(r.from) + "|" + dkey(r.to);
-  var cached = stats.cache[key], seq = ++stats.seq;
+  var key = statsKey(r);
+  var cached = statsCached(key), seq = ++stats.seq;
   if (cached) renderStats(cached); else el("statsBody").innerHTML = '<div class="pending tall"><span class="spinner sm"></span></div>';
   if (navigator.onLine === false || state.offline) {
+    setStatsSync(cached ? "staleOffline" : "");
     if (!cached) el("statsBody").innerHTML = '<div class="pending tall"><span class="muted">' + esc(t("stats.waitNet")) + '</span></div>';
     return;
   }
-  // всегда берём свежие цифры: показываем сохранённые сразу, обновляем, когда придёт ответ
+  // всегда берём свежие цифры: сохранённые видны сразу, под периодом — «Обновляется…», пока не придёт ответ
+  setStatsSync(cached ? "sync" : "");
   call("apiGetStats", [dkey(r.from), dkey(r.to)], function (res) {
-    stats.cache[key] = res;
-    if (seq === stats.seq) renderStats(res);
+    statsSave(key, res);
+    if (seq !== stats.seq) return;
+    renderStats(res);
+    setStatsSync("");
+    prefetchPrevStats(k);
   }, function (msg, kind) {
-    if (seq !== stats.seq || cached) return;
+    if (seq !== stats.seq) return;
+    if (cached) { setStatsSync(kind === "network" ? "staleOffline" : "stale"); return; }
+    setStatsSync("");
     el("statsBody").innerHTML = '<div class="pending tall"><span class="muted">' + esc(kind === "network" ? t("stats.waitNet") : t("stats.loadFailed", { msg: msg })) +
       '</span><button class="link inline" data-act="loadStats">' + esc(t("retry")) + '</button></div>';
   });
+}
+// Предыдущий промежуток (стрелка ‹) загружаем заранее, если его ещё нет на телефоне: тогда переход откроется сразу.
+// Только для отчётного периода, месяца и года; ответ просто сохраняется, на экран не выводится.
+function prefetchPrevStats(k) {
+  if (k === "c" || state.offline || navigator.onLine === false) return;
+  var key = statsKey(rangeFor(k, stats.offset - 1)), r = rangeFor(k, stats.offset - 1);
+  if (statsCached(key)) return;
+  call("apiGetStats", [dkey(r.from), dkey(r.to)], function (res) { statsSave(key, res); }, function () {});
 }
 function renderStats(res) {
   var html = '<div class="card stat-sum"><div><div class="cap">' + esc(t("stats.spent")) + '</div><div class="val">' + esc(fmtEur(res.spent)) + '</div></div>' +

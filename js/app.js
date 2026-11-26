@@ -13,7 +13,7 @@ function readParams() {
     var newApi = isApiUrl(q.api) && q.api !== store("api") ? q.api : "";
     if (newApi && !q.t) newApi = ""; // адрес без ключа — не меняем
     if (q.t) store("token", q.t);
-    if (newApi) { store("api", newApi); store("init", null); } // другой сервер — справочники и историю берём заново с него
+    if (newApi) { store("api", newApi); store("init", null); store("stats", null); } // другой сервер — справочники, историю и статистику берём заново с него
     if (q.sms) session("sms", q.sms);
     var rest = new URLSearchParams();
     Object.keys(q).forEach(function (k) { if (k !== "t" && k !== "api" && k !== "sms") rest.append(k, q[k]); });
