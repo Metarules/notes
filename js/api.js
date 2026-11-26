@@ -18,6 +18,9 @@ function isApiUrl(u) { return /^https:\/\/script\.google\.com\/macros\/s\/[\w-]+
 function hasAccess() { return isApiUrl(store("api")) && !!store("token"); }
 
 var TIMEOUT_MS = 30000; // дольше ответа не ждём: на плохой связи иначе индикатор крутится бесконечно
+// (сервер ждёт свою блокировку меньше — LOCK_WAIT_MS, — чтобы «Сервер занят» успел дойти до страницы)
+// ответа нет: связи нет ("network") или сервер не ответил вовремя ("timeout") — запрос мог и выполниться
+function noAnswer(kind) { return kind === "network" || kind === "timeout"; }
 
 // opts.keepalive — запрос доходит до сервера, даже если форму закрыли сразу после «Сохранить»
 function call(fn, args, onOk, onErr, opts) {
@@ -59,9 +62,11 @@ function call(fn, args, onOk, onErr, opts) {
     .catch(function (e) {
       clearTimeout(timer);
       if (e && e.server) { setOnline(true); fail(e.server); return; } // ответила страница ошибки Google — связь есть
+      // Не дождались ответа (TIMEOUT_MS) — это не «нет связи»: запрос мог дойти, и сервер мог его выполнить.
+      // Плашку «Нет связи» не включаем; что делать дальше, решает тот, кто звал (kind "timeout").
+      if (e && e.name === "AbortError") { fail(t("err.timeout"), "timeout"); return; }
       setOnline(false);
-      if (e && e.name === "AbortError") fail(t("err.timeout"), "network");
-      else fail(t("err.network"), "network");
+      fail(t("err.network"), "network");
     });
 }
 

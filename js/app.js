@@ -4,12 +4,16 @@
 // sms — текст СМС от шортката (разбираем здесь, на странице); src=clip — текст взят из буфера обмена;
 // tab=history — сразу открыть историю; t — ключ доступа, api — адрес сервера: их запоминаем на устройстве.
 // Ключ, адрес и текст СМС сразу убираем из адресной строки.
+// Новый адрес сервера принимаем только вместе с ключом: иначе чужая ссылка «#api=…» без ключа
+// отправила бы уже сохранённый на телефоне ключ на сервер злоумышленника.
 function readParams() {
   var q = {};
   try { new URLSearchParams(location.hash.replace(/^#/, "")).forEach(function (v, k) { q[k] = v; }); } catch (e) {}
   if (q.t || q.api || q.sms) {
+    var newApi = isApiUrl(q.api) && q.api !== store("api") ? q.api : "";
+    if (newApi && !q.t) newApi = ""; // адрес без ключа — не меняем
     if (q.t) store("token", q.t);
-    if (isApiUrl(q.api)) store("api", q.api);
+    if (newApi) { store("api", newApi); store("init", null); } // другой сервер — справочники и историю берём заново с него
     if (q.sms) session("sms", q.sms);
     var rest = new URLSearchParams();
     Object.keys(q).forEach(function (k) { if (k !== "t" && k !== "api" && k !== "sms") rest.append(k, q[k]); });

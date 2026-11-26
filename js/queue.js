@@ -66,7 +66,8 @@ function flushCancels() {
     flushCancels();
   }, function (msg, kind) {
     cancelling = false;
-    if (kind !== "network") { // сервер отказал — повтор не поможет; операция останется в истории, удалить можно обычным свайпом
+    if (kind === "timeout") { setTimeout(flushCancels, QUEUE_RETRY_MS); return; } // сервер не ответил — попробуем ещё раз
+    if (!noAnswer(kind)) { // сервер отказал — повтор не поможет; операция останется в истории, удалить можно обычным свайпом
       cancels(cancels().filter(function (x) { return x !== id; }));
       refreshHistory();
       toast(t("q.cancelFailed", { msg: msg }), true);
@@ -80,6 +81,7 @@ function refreshHistory() {
 // Очередь уходит одним запросом (addMany, до SEND_BATCH операций): сервер пишет их подряд и отвечает по каждой.
 // sendingIds — операции, которые прямо сейчас уходят на сервер (для статуса «отправляется…»)
 var SEND_BATCH = 25, flushing = false, flushedCount = 0, sendingIds = [];
+var QUEUE_RETRY_MS = 15000; // сервер не ответил вовремя — через столько повторяем отправку (дублей не будет: id)
 // now — отправить сразу, даже если считаем, что связи нет (после «Сохранить» связь могла вернуться)
 function flushOutbox(now) {
   if (flushing || (state.offline && !now) || navigator.onLine === false) return;
@@ -121,7 +123,9 @@ function flushOutbox(now) {
     outbox(outbox().map(function (x) { return ids.indexOf(x.form.id) > -1 ? Object.assign({}, x, { off: true }) : x; }));
     updateNetBar();
     refreshHistory();
-    if (kind !== "network") toast(t("q.sendFailed", { msg: msg }), true);
+    // сервер не ответил вовремя: операции, возможно, уже записаны — повтор безопасен (сервер узнает их по id)
+    if (kind === "timeout") setTimeout(flushOutbox, QUEUE_RETRY_MS);
+    else if (!noAnswer(kind)) toast(t("q.sendFailed", { msg: msg }), true);
   }, { keepalive: true });
 }
 // телефон снова в сети — сразу пробуем загрузить; пропала сеть — сразу показываем плашку

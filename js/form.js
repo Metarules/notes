@@ -216,6 +216,7 @@ function save() {
       });
     }, function (msg, kind) {
       pendingEdits--;
+      if (kind === "timeout") { checkEditLater(old); return; }
       undoEditLocally(old);
       if (kind === "network") toast(t("form.noNetEditLost"), true); else toast(t("form.editFailed", { msg: msg }), true);
     }, { keepalive: true });
@@ -332,6 +333,21 @@ function showEditLocally(ed, form) {
   list[i] = r;
   if (canRedrawHistory()) renderHistory(list.sort(byDateDesc)); else state.recent = list.sort(byDateDesc);
   return old;
+}
+// Сервер не ответил вовремя: изменение могло и записаться. Не говорим «не сохранилось» — перечитываем историю
+// с сервера и показываем, как есть на самом деле; не удалось перечитать — возвращаем прежний вид.
+var EDIT_CHECK_DELAY_MS = 2000;
+function checkEditLater(old) {
+  toast(t("form.editUnknown"), false, TOAST_LONG_MS);
+  setTimeout(function () {
+    call("apiGetRecent", [], function (list) {
+      freshRecent = list;
+      redrawWhenFree(function () { renderHistory(withOlder(freshRecent)); });
+    }, function () {
+      undoEditLocally(old);
+      toast(t("form.editCheckFailed"), true);
+    });
+  }, EDIT_CHECK_DELAY_MS);
 }
 // сервер не сохранил изменение — возвращаем операцию к прежнему виду
 function undoEditLocally(old) {

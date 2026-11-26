@@ -189,8 +189,10 @@ function deleteRow(i) {
     allDone(full);
   }, function (msg, kind) {
     pendingDeletes--;
-    if (kind === "network") toast(t("form.noNetDelete"), false, TOAST_LONG_MS); else toast(msg, true);
-    if (kind !== "network") deleteFailed = true; // без связи перечитать всё равно не выйдет
+    if (kind === "network") toast(t("form.noNetDelete"), false, TOAST_LONG_MS);
+    else if (kind === "timeout") toast(t("hist.deleteUnknown"), false, TOAST_LONG_MS); // могла и удалиться — перечитаем
+    else toast(msg, true);
+    if (kind !== "network") deleteFailed = true; // после всех ответов перечитаем историю; без связи — всё равно не выйдет
     var back = state.recent.concat([r]).sort(byDateDesc);
     if (canRedrawHistory()) renderHistory(back); else state.recent = back;
     allDone(null);
