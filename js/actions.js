@@ -1,6 +1,7 @@
 // Нажатия на кнопки. Обработчики onclick="…" в разметке защита страницы (CSP) запрещает, поэтому у кнопки —
 // data-act="действие" и при необходимости data-arg="значение", а здесь один общий обработчик на весь документ.
 // Так же для полей: data-change="действие" — при изменении значения.
+// Snd.tap() — мягкий щелчок нажатия (sounds.js); только у нажатий, а не у вызовов из кода
 var ACTIONS = {
   load: function () { load(); },
   save: function () { save(); },
@@ -10,16 +11,16 @@ var ACTIONS = {
   clearAmount: function () { clearAmount(); },
   toggleCurPanel: function () { toggleCurPanel(); },
   pickCurrency: function (a) { pickCurrency(Number(a)); },
-  userPickCategory: function (a) { userPickCategory(Number(a)); },
+  userPickCategory: function (a) { Snd.tap(); userPickCategory(Number(a)); },
   toggleTheme: function () { toggleTheme(); },
-  togglePattern: function () { togglePattern(); },
-  toggleHaptics: function () { toggleHaptics(); },
+  togglePattern: function () { Snd.tap(); togglePattern(); },
+  toggleHaptics: function () { Snd.tap(); toggleHaptics(); },
   toggleSounds: function () { toggleSounds(); },
   openDiag: function () { openDiag(); },
-  showHistPane: function (a) { showHistPane(a); },
+  showHistPane: function (a) { Snd.tap(); showHistPane(a); },
   retryOlder: function () { retryOlder(); },
-  setStatsKind: function (a) { setStatsKind(a); },
-  shiftStats: function (a) { shiftStats(Number(a)); },
+  setStatsKind: function (a) { Snd.tap(); setStatsKind(a); },
+  shiftStats: function (a) { Snd.tap(); shiftStats(Number(a)); },
   loadStats: function () { loadStats(true); }, // «Повторить» и смена своих дат — запрос заново
   setLang: function () { setLang(); }
 };

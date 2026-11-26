@@ -1,10 +1,13 @@
-// Звуки действий: «Сохранить» — касса (щелчок и «живой» колокольчик), «Удалить» — мягкий взмах.
+// Звуки действий: «Сохранить» — касса (щелчок и «живой» колокольчик); свайп, открывший «Удалить», —
+// мягкий короткий взмах; остальные нажатия (Snd.tap: «Удалить», категории, вкладки и периоды статистики,
+// тумблеры настроек) — мягкий двойной щелчок, как в начале кассы.
 // Синтезируются Web Audio прямо здесь, без файлов. Тихие и короткие; режим тишины iPhone (Silent mode)
 // их глушит, музыку и подкасты они не прерывают: сеанс звука страницы — «ambient» (navigator.audioSession,
 // Safari 16.4+). Звучат только в ответ на касание: иначе iOS не даст.
 // Выключаются в «Настройках» («Звуки»); выбор — на этом устройстве ("sounds").
 var SOUND_VOLUME = 0.4;        // общая громкость (как на странице проверки по умолчанию)
-var SOUND_IDLE_MS = 3000;      // после звука аудио засыпает, чтобы не держать динамик и батарею
+var SOUND_IDLE_MS = 30000;     // после тишины аудио засыпает, чтобы не держать динамик и батарею;
+                               // не сразу: свайп разбудить его может не всегда, а по касанию он сработает
 var Snd = (function () {
   var ctx = null, master = null, noiseBuf = null, idle = 0;
 
@@ -71,13 +74,13 @@ var Snd = (function () {
     }
     return (pinkBuf = b);
   }
-  // взмах: розовый шум через полосу, центр которой идёт по точкам fs; громкость — плавный «горб»,
-  // нарастает до доли p длительности и мягко гаснет, без щелчков на краях
-  function whoosh(c, out, t, d, fs, peak, p) {
+  // взмах: розовый шум через полосу (добротность q, верх срезан на cut), центр которой идёт по точкам fs;
+  // громкость — плавный «горб»: нарастает до доли p длительности и мягко гаснет, без щелчков на краях
+  function whoosh(c, out, t, d, fs, peak, p, q, cut) {
     var s = c.createBufferSource(), bp = c.createBiquadFilter(), lp = c.createBiquadFilter(), g = c.createGain();
     s.buffer = pink(c);
-    bp.type = "bandpass"; bp.Q.value = 0.8;
-    lp.type = "lowpass"; lp.frequency.value = 7000;
+    bp.type = "bandpass"; bp.Q.value = q;
+    lp.type = "lowpass"; lp.frequency.value = cut;
     bp.frequency.setValueAtTime(fs[0], t);
     for (var i = 1; i < fs.length; i++) bp.frequency.exponentialRampToValueAtTime(fs[i], t + d * i / (fs.length - 1));
     var curve = new Float32Array(64);
@@ -91,8 +94,22 @@ var Snd = (function () {
     s.connect(bp); bp.connect(lp); lp.connect(g); g.connect(out);
     s.start(t, Math.random()); s.stop(t + d + 0.05);
   }
-  function swoosh(c, out, t) { // мягкий взмах: «пролетел мимо» — высота вверх и вниз
-    whoosh(c, out, t, 0.3, [700, 2200, 900], 0.9, 0.45);
+  function swoosh(c, out, t) { // мягкий короткий взмах: «пролетел мимо» — высота вверх и вниз, без верхнего шипения
+    whoosh(c, out, t, 0.22, [550, 1500, 750], 0.85, 0.42, 0.7, 3500);
+  }
+  // мягкий щелчок: розовый шум в полосе f, верх срезан на lp, атака a
+  function softClick(c, out, t, d, f, q, peak, a, lp) {
+    var s = c.createBufferSource(), bp = c.createBiquadFilter(), l = c.createBiquadFilter(), g = c.createGain();
+    s.buffer = pink(c);
+    bp.type = "bandpass"; bp.Q.value = q; bp.frequency.value = f;
+    l.type = "lowpass"; l.frequency.value = lp;
+    env(g, t, a, peak, d);
+    s.connect(bp); bp.connect(l); l.connect(g); g.connect(out);
+    s.start(t, Math.random()); s.stop(t + d + 0.05);
+  }
+  function tick(c, out, t) { // мягкий двойной щелчок
+    softClick(c, out, t, 0.022, 1200, 1, 1.3, 0.002, 2800);
+    softClick(c, out, t + 0.035, 0.018, 1550, 1, 0.75, 0.002, 3000);
   }
   function register(c, out, t) { // касса: два щелчка ящика и «дзинь»
     click(c, out, t, 0.03, 1800, 1.2, 0.45);
@@ -116,5 +133,10 @@ var Snd = (function () {
       sleepLater();
     } catch (e) {}
   }
-  return { on: on, save: function (force) { play(register, force); }, del: function () { play(swoosh); } };
+  return {
+    on: on,
+    save: function (force) { play(register, force); },
+    swipe: function () { play(swoosh); },
+    tap: function () { play(tick); }
+  };
 })();
