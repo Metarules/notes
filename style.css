@@ -15,6 +15,15 @@ input, select, textarea { font-family:inherit; } /* округлый шрифт 
    Цвет и бледность заданы в самих картинках (своя для каждой темы); выключается в «Настройках» вместе с мордочками */
 html { background-image:url(img/cats-light.svg?v=57); background-size:150px 150px; background-repeat:repeat; }
 html[data-theme="dark"] { background-image:url(img/cats-dark.svg?v=57); }
+/* Когда страница прокручена до самого низа, iOS 26 подтягивает её конец к верху плавающей панели Safari, а под панелью
+   рисует уже не страницу, а просто цвет фона — узор там обрывается резкой линией. Со стороны страницы это не убрать,
+   поэтому узор плавно сходит на нет в нижнем отступе страницы (там нет содержимого): обрыва не видно */
+/* страница не короче экрана: иначе на коротких экранах (настройки) под её концом снова был бы узор, и плавный переход
+   получился бы полосой посреди экрана */
+body { position:relative; min-height:100vh; min-height:100lvh; }
+body::after { content:""; position:absolute; left:0; right:0; bottom:0; height:calc(96px + env(safe-area-inset-bottom)); pointer-events:none;
+  background:linear-gradient(to bottom, rgba(0,0,0,0), var(--bg)); }
+html[data-cats="off"] body::after { display:none; }
 /* котики выключены в «Настройках» — нет ни узора, ни мордочек на ошибках */
 html[data-cats="off"] { background-image:none; }
 html[data-cats="off"] .cat-ill, html[data-cats="off"] .nb-cat { display:none !important; }
