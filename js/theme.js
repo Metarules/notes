@@ -86,7 +86,7 @@ function relocalize() {
 function toggleTheme() { setTheme(currentTheme() === "dark" ? "light" : "dark"); }
 
 // Фон с котиками: включён, пока его не выключили в «Настройках»; выбор — на этом устройстве ("pattern").
-// Сам узор — в стилях (body::before), до отрисовки атрибут ставит theme-init.js.
+// Сам узор — фон html в стилях, до отрисовки атрибут ставит theme-init.js.
 function patternOn() { return store("pattern") !== "off"; }
 function applyPattern() {
   var on = patternOn();

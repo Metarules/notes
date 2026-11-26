@@ -1,28 +1,21 @@
 :root { --bg:#f6f7f9; --card:#fff; --field:#fff; --text:#1d1f23; --muted:#8a9099; --accent:#2563eb; --accent-soft:#e8efff; --line:#e5e7eb; --ok:#16a34a; --danger:#dc2626; --toast:#1d1f23;
-  --toast-text:#fff; --shadow:rgba(0,0,0,.06); --warn:#92400e; --warn-bg:#fef3c7; --illus:#4b5563; --pattern-ink:#1d1f23; --pattern-op:.05; color-scheme:light; }
+  --toast-text:#fff; --shadow:rgba(0,0,0,.06); --warn:#92400e; --warn-bg:#fef3c7; --illus:#4b5563; color-scheme:light; }
 html[data-theme="dark"] { --bg:#111317; --card:#1b1e24; --field:#23272e; --text:#e8eaed; --muted:#9aa0a6; --accent:#3b82f6; --accent-soft:#1e2a44; --line:#2f343c; --ok:#4ade80;
-  --danger:#f87171; --toast:#e8eaed; --toast-text:#111317; --shadow:rgba(0,0,0,.4); --warn:#fcd34d; --warn-bg:#3a2e12; --illus:#c4c7cc; --pattern-ink:#fff; --pattern-op:.04; color-scheme:dark; }
+  --danger:#f87171; --toast:#e8eaed; --toast-text:#111317; --shadow:rgba(0,0,0,.4); --warn:#fcd34d; --warn-bg:#3a2e12; --illus:#c4c7cc; color-scheme:dark; }
 /* значения, которые читает и скрипт (cssNum): высота строки в списке валют, длительность сдвига карточки */
 :root { --cur-row-h:52px; --swipe-ms:250ms; }
 * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 html { background:var(--bg); }
-/* фон страницы — только у html: у body фона нет, иначе он закрыл бы узор с котиками (body::before лежит под body)
-   везде, где есть содержимое, и узор был бы виден лишь ниже последней карточки */
+/* фон страницы — только у html (там же узор с котиками): у body фона нет, иначе он закрыл бы узор под содержимым */
 body { margin:0; font-family:ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background:transparent; color:var(--text); font-size:16px; }
 button { font-family:inherit; cursor:pointer; }
 input, select, textarea { font-family:inherit; } /* округлый шрифт и в полях */
-/* фон с котиками (вариант B): узор — маска из img/cats.svg, цвет и бледность — из темы; выключается в «Настройках».
-   Отдельный неподвижный слой под всем содержимым: при прокрутке не едет и не дёргается на iPhone */
-/* слой не неподвижный, а во всю высоту страницы и прокручивается вместе с ней: в iOS 26 неподвижные слои
-   обрезаются над плавающей нижней панелью Safari, а обычное содержимое под ней видно; заодно узор не «рябит»
-   за карточками при прокрутке */
-/* при оттягивании страницы за край (пружина iOS) за краем видна пустота без узора: пружину выключаем,
-   а сверху слой ещё и выходит за край страницы — на случай, если браузер всё же оттянет */
-html { overscroll-behavior-y:none; }
-body { position:relative; min-height:100vh; min-height:100lvh; }
-body::before { content:""; position:absolute; left:0; right:0; top:-400px; bottom:0; z-index:-1; pointer-events:none; background-color:var(--pattern-ink); opacity:var(--pattern-op);
-  -webkit-mask-image:url(img/cats.svg?v=51); mask-image:url(img/cats.svg?v=51); -webkit-mask-size:150px 150px; mask-size:150px 150px; -webkit-mask-repeat:repeat; mask-repeat:repeat; }
-html[data-pattern="off"] body::before { display:none; }
+/* фон с котиками (вариант B) — фон всего окна (html): он повторяется бесконечно во все стороны и прокручивается
+   вместе со страницей, поэтому виден и под плавающей нижней панелью Safari, и за краями при оттягивании страницы.
+   Цвет и бледность заданы в самих картинках (своя для каждой темы); выключается в «Настройках» */
+html { background-image:url(img/cats-light.svg?v=57); background-size:150px 150px; background-repeat:repeat; }
+html[data-theme="dark"] { background-image:url(img/cats-dark.svg?v=57); }
+html[data-pattern="off"] { background-image:none; }
 /* котик на ошибках (catFace в core.js): линии — приглушённые, слеза — цвет кнопок */
 .cat-ill { display:flex; justify-content:center; color:var(--illus); }
 .cat-ill:empty { display:none; }
