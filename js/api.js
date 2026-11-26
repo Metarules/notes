@@ -7,6 +7,7 @@ var API = {
   apiGetRecent: function () { return { fn: "recent" }; },
   apiGetOlder: function (before) { return { fn: "recent", before: before }; },
   apiGetStats: function (from, to) { return { fn: "stats", from: from, to: to }; },
+  apiGetStatsAll: function () { return { fn: "statsAll" }; },
   apiAddTransaction: function (form) { return { fn: "add", form: form }; },
   apiAddMany: function (forms) { return { fn: "addMany", forms: forms }; },
   apiUpdateTransaction: function (row, expected, form) { return { fn: "update", row: row, expected: expected, form: form }; },

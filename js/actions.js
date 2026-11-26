@@ -17,7 +17,7 @@ var ACTIONS = {
   retryOlder: function () { retryOlder(); },
   setStatsKind: function (a) { setStatsKind(a); },
   shiftStats: function (a) { shiftStats(Number(a)); },
-  loadStats: function () { loadStats(); },
+  loadStats: function () { loadStats(true); }, // «Повторить» и смена своих дат — запрос заново
   setLang: function () { setLang(); }
 };
 

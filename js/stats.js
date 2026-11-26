@@ -41,7 +41,7 @@ function showHistPane(p) {
   el("paneOps").classList.toggle("hidden", p !== "ops");
   el("paneStats").classList.toggle("hidden", p !== "stats");
   window.scrollTo(0, 0);
-  if (p === "stats") loadStats(); else setTimeout(checkMore, 0);
+  if (p === "stats") loadStats(true); else setTimeout(checkMore, 0);
 }
 function setStatsKind(k) {
   if (k === "c" && !el("dFrom").value) { // свои даты — начинаем с того, что было на экране
@@ -58,18 +58,22 @@ function updateKindLabel() {
   el("kindSeg").querySelector('[data-k="p"]').textContent = t("kind.p", { n: n, nth: ordinalEn(n) });
 }
 // ---------- сохранённые цифры статистики ----------
-// Ответы сервера по каждому промежутку хранятся и на телефоне ("stats"): статистика открывается сразу
-// с сохранёнными цифрами, а свежие приходят фоном и тихо их заменяют (строка «Обновляется…» под периодом).
-var STATS_KEEP = 40; // сколько промежутков помним на телефоне (самые свежие по времени ответа)
+// Ответы сервера хранятся и на телефоне ("stats"): статистика открывается сразу с сохранёнными цифрами,
+// а свежие приходят фоном и тихо их заменяют (строка «Обновляется…» под периодом).
+// Отчётные периоды, месяцы и годы приходят все сразу одним запросом (statsAll): на сервере дорого само обращение
+// к таблице, а не число строк, поэтому один общий запрос вместо запроса на каждый период — и переключение
+// периодов (‹ ›, «С 20-го / Месяц / Год») после него мгновенное. «Свои даты» и периоды старше тех, что в общем
+// ответе, — отдельным запросом (apiGetStats).
+var STATS_KEEP = 150; // сколько промежутков помним на телефоне (общий ответ — около 50)
 function statsStore() { try { var o = JSON.parse(store("stats") || "{}"); return o && typeof o === "object" ? o : {}; } catch (e) { return {}; } }
 function statsCached(key) {
   if (!stats.cache[key]) { var o = statsStore()[key]; if (o && o.r) stats.cache[key] = o.r; }
   return stats.cache[key] || null;
 }
-function statsSave(key, res) {
-  stats.cache[key] = res;
-  var o = statsStore();
-  o[key] = { r: res, at: Date.now() };
+// list — [[ключ, ответ], …]; на телефон пишем одним разом
+function statsSave(list) {
+  var o = statsStore(), now = Date.now();
+  list.forEach(function (x) { stats.cache[x[0]] = x[1]; o[x[0]] = { r: x[1], at: now }; });
   var keys = Object.keys(o).sort(function (a, b) { return (o[b].at || 0) - (o[a].at || 0); });
   keys.slice(STATS_KEEP).forEach(function (k) { delete o[k]; });
   try { store("stats", JSON.stringify(o)); } catch (e) {}
@@ -85,7 +89,33 @@ function setStatsSync(mode) {
   else b.textContent = "";
 }
 function statsKey(r) { return dkey(r.from) + "|" + dkey(r.to); }
-function loadStats() {
+function statsVisible() { return !el("view-history").classList.contains("hidden") && stats.pane === "stats"; }
+
+// общий ответ: loading — идёт запрос; at — когда пришёл последний; err — вид ошибки последнего запроса ("" — не было)
+var statsAll = { loading: false, at: 0, err: "" };
+function refreshStatsAll() {
+  if (statsAll.loading) return;
+  statsAll.loading = true;
+  statsAll.err = "";
+  call("apiGetStatsAll", [], function (res) {
+    statsAll.loading = false;
+    statsAll.at = Date.now();
+    var names = (res && res.names) || {};
+    statsSave(((res && res.periods) || []).map(function (p) {
+      (p.categories || []).forEach(function (c) { if (!c.categoryName) c.categoryName = names[c.categoryId] || c.categoryId; });
+      return [p.from + "|" + p.to, p];
+    }));
+    if (statsVisible()) loadStats();
+  }, function (msg, kind) {
+    statsAll.loading = false;
+    statsAll.err = kind || "server";
+    if (statsVisible()) loadStats();
+  });
+}
+
+// fresh — статистику только что открыли (или нажали «Повторить»): обновляем общий ответ с сервера.
+// Без fresh (‹ ›, смена вида, смена языка) — показываем то, что уже есть, без нового запроса.
+function loadStats(fresh) {
   var k = stats.kind, r;
   updateKindLabel();
   [].forEach.call(el("kindSeg").children, function (b) { b.classList.toggle("on", b.getAttribute("data-k") === k); });
@@ -107,14 +137,21 @@ function loadStats() {
     if (!cached) el("statsBody").innerHTML = '<div class="pending tall"><span class="muted">' + esc(t("stats.waitNet")) + '</span></div>';
     return;
   }
-  // всегда берём свежие цифры: сохранённые видны сразу, под периодом — «Обновляется…», пока не придёт ответ
+  if (k === "c") { loadOneStats(key, r, cached, seq); return; }
+  if (fresh || (!statsAll.at && !statsAll.err)) refreshStatsAll();
+  // общий ответ ещё идёт — когда придёт, loadStats покажет свежие цифры
+  if (statsAll.loading) { setStatsSync(cached ? "sync" : ""); return; }
+  if (cached) { setStatsSync(statsAll.err ? (statsAll.err === "network" ? "staleOffline" : "stale") : ""); return; }
+  loadOneStats(key, r, null, seq); // периода нет в общем ответе (старше) или общий не пришёл — запрашиваем отдельно
+}
+// один промежуток отдельным запросом: «Свои даты», старые периоды; сохранённое (если есть) видно сразу
+function loadOneStats(key, r, cached, seq) {
   setStatsSync(cached ? "sync" : "");
   call("apiGetStats", [dkey(r.from), dkey(r.to)], function (res) {
-    statsSave(key, res);
+    statsSave([[key, res]]);
     if (seq !== stats.seq) return;
     renderStats(res);
     setStatsSync("");
-    prefetchPrevStats(k);
   }, function (msg, kind) {
     if (seq !== stats.seq) return;
     if (cached) { setStatsSync(kind === "network" ? "staleOffline" : "stale"); return; }
@@ -122,14 +159,6 @@ function loadStats() {
     el("statsBody").innerHTML = '<div class="pending tall"><span class="muted">' + esc(kind === "network" ? t("stats.waitNet") : t("stats.loadFailed", { msg: msg })) +
       '</span><button class="link inline" data-act="loadStats">' + esc(t("retry")) + '</button></div>';
   });
-}
-// Предыдущий промежуток (стрелка ‹) загружаем заранее, если его ещё нет на телефоне: тогда переход откроется сразу.
-// Только для отчётного периода, месяца и года; ответ просто сохраняется, на экран не выводится.
-function prefetchPrevStats(k) {
-  if (k === "c" || state.offline || navigator.onLine === false) return;
-  var key = statsKey(rangeFor(k, stats.offset - 1)), r = rangeFor(k, stats.offset - 1);
-  if (statsCached(key)) return;
-  call("apiGetStats", [dkey(r.from), dkey(r.to)], function (res) { statsSave(key, res); }, function () {});
 }
 function renderStats(res) {
   var html = '<div class="card stat-sum"><div><div class="cap">' + esc(t("stats.spent")) + '</div><div class="val">' + esc(fmtEur(res.spent)) + '</div></div>' +
@@ -167,6 +196,6 @@ function showTab(name) {
   el("setBar").classList.toggle("hidden", !st);
   window.scrollTo(0, 0);
   scheduleFit();
-  if (h && stats.pane === "stats") loadStats(); // свежие цифры — могли добавиться операции
+  if (h && stats.pane === "stats") loadStats(true); // свежие цифры — могли добавиться операции
   else if (h) setTimeout(checkMore, 0);
 }
