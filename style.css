@@ -14,18 +14,20 @@ input, select, textarea { font-family:inherit; } /* округлый шрифт 
    Сама страница всегда стоит в начале: в iOS 26 под плавающей нижней панелью рисуется только то, что есть на странице,
    и прокрученная до конца страница оставляла там пустую полосу цвета фона. */
 html { height:100%; overflow:hidden; overscroll-behavior:none; }
-/* высота области — ровно видимое окно (100%), а не «большое» 100lvh: в окне шортката 100lvh выше видимого,
-   и низ страницы при полной прокрутке уезжал под панель Safari. Если окно кончается над панелью, под ней
-   продолжается тот же неподвижный узор фона страницы (html) — он совпадает с узором области */
+/* Окно страницы в шорткате — только промежуток между панелями Safari (замер: html = видимая часть = 647 из 852,
+   отступы безопасной зоны — 0). Область прокрутки уходит ниже окна на --bleed, под нижние кнопки Safari: там видно
+   и узор, и проезжающее содержимое. Внутри области снизу такой же запас — последняя карточка останавливается
+   у верхнего края кнопок, а не под ними */
+:root { --bleed:150px; }
 body { height:100%; }
-.scroller { height:100%; overflow-x:hidden; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+.scroller { height:calc(100% + var(--bleed)); overflow-x:hidden; overflow-y:auto; -webkit-overflow-scrolling:touch; }
 /* фон с котиками (вариант B) — у самой прокручиваемой области и неподвижен, как обои чата: карточки едут поверх.
    Один слой узора — нигде не обрывается (он во весь экран, в том числе под панелями Safari) и не двоится,
    в том числе когда содержимое пружинит у края. Цвет и бледность заданы в самих картинках (своя для каждой темы) */
 /* по ширине — целое число плиток (round: плитка чуть сжимается или растягивается под ширину экрана, пропорционально),
    поэтому у правого края нет обрезков котиков; по высоте — как есть */
 html, .scroller { background-color:var(--bg); background-image:url(img/cats-light.svg?v=57); background-size:150px auto; background-repeat:round repeat; }
-.scroll-bg { min-height:100%; }
+.scroll-bg { min-height:100%; padding-bottom:var(--bleed); }
 html[data-theme="dark"], html[data-theme="dark"] .scroller { background-image:url(img/cats-dark.svg?v=57); }
 /* котики выключены в «Настройках» — нет ни узора, ни мордочек на ошибках */
 html[data-cats="off"], html[data-cats="off"] .scroller { background-image:none; }
@@ -42,10 +44,8 @@ html[data-cats="off"] .cat-ill, html[data-cats="off"] .nb-cat { display:none !im
 .sw-knob { position:absolute; top:3px; left:3px; width:22px; height:22px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.25); transition:transform .2s; }
 .sw[aria-checked="true"] .sw-knob { transform:translateX(20px); }
 @media (prefers-reduced-motion: reduce) { .sw, .sw-knob { transition:none; } }
-.wrap { max-width:480px; margin:0 auto; padding:calc(10px + env(safe-area-inset-top)) 14px max(88px, calc(env(safe-area-inset-bottom) + 16px)); }
-/* снизу — запас под плавающую панель Safari: в iOS 26 нижний отступ безопасной зоны уже включает её высоту, поэтому
-   берём его (+16 px), а если он маленький (старый iOS, окно без панели) — не меньше 88 px. Раньше было 96 px сверх
-   отступа — двойной запас, под последней карточкой оставалось слишком много пустоты */
+.wrap { max-width:480px; margin:0 auto; padding:calc(10px + env(safe-area-inset-top)) 14px calc(16px + env(safe-area-inset-bottom)); }
+/* снизу — небольшой отступ: место под нижние кнопки Safari уже оставляет запас области прокрутки (--bleed) */
 .hidden { display:none !important; }
 .muted { color:var(--muted); font-size:13px; }
 /* загрузка */
