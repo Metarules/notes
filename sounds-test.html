@@ -31,26 +31,19 @@ input[type=range] { width:100%; }
 <input type="range" id="vol" min="5" max="100" step="5" value="40" aria-label="Громкость">
 </div>
 
-<h2>Звук на свайпе</h2>
+<h2>Универсальный звук касания</h2>
+<p>Для «Удалить» и, если понравится, других кнопок. Понажимайте подряд по нескольку раз: важно, чтобы не надоедал.</p>
 <div class="case">
-<div class="pick">
-<label><input type="radio" name="sw" value="swipe" checked> 1. Прежний</label>
-<label><input type="radio" name="sw" value="swipe2"> 2. Мягче</label>
-<label><input type="radio" name="sw" value="swipe3"> 3. Ещё мягче, низкий</label>
-<label><input type="radio" name="sw" value="swipe4"> 4. Мягкий, короткий</label>
-</div>
-<div id="strip" class="strip">← Проведите пальцем влево и отпустите</div>
-</div>
-
-<h2>Для нажатия «Удалить» — ластик</h2>
-<div class="case">
-<button class="del" data-s="eraser">1. Прежний <span>для сравнения</span></button>
-<button class="del" data-s="eraser2">2. Ниже и глуше <span>два движения</span></button>
-<button class="del" data-s="eraser3">3. Совсем мягкий <span>плавнее</span></button>
-<button class="del" data-s="eraser4">4. Одно движение <span>мягкое</span></button>
+<button data-s="tap1">1. Мягкий щелчок</button>
+<button data-s="tap2">2. Деревянный «тук» <span>приглушённый</span></button>
+<button data-s="tap3">3. Капля «туп»</button>
+<button data-s="tap4">4. Палец по стеклу <span>низкий, глухой</span></button>
+<button data-s="tap5">5. Камешек <span>светлый, крошечный</span></button>
+<button data-s="tap6">6. Пузырёк <span>вверх</span></button>
+<button class="del" data-s="eraser4">Ластик <span>для сравнения</span></button>
 </div>
 
 <p id="log"></p>
-<script src="sounds-test.js?v=6"></script>
+<script src="sounds-test.js?v=7"></script>
 </body>
 </html>

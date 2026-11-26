@@ -75,29 +75,31 @@ var T = (function () {
     swipe: function (c, o, t) { // взмах — для свайпа
       whoosh(c, o, t, 0.3, [700, 2200, 900], 0.9, 0.45);
     },
-    swipe2: function (c, o, t) { // свайп 2: мягче — ниже и без верхнего шипения
-      whoosh(c, o, t, 0.3, [500, 1500, 700], 0.85, 0.45, 0.7, 3500);
-    },
-    swipe3: function (c, o, t) { // свайп 3: ещё мягче, низкий и чуть длиннее
-      whoosh(c, o, t, 0.34, [380, 1050, 480], 0.8, 0.5, 0.6, 2400);
-    },
-    swipe4: function (c, o, t) { // свайп 4: мягкий и короткий
-      whoosh(c, o, t, 0.22, [550, 1500, 750], 0.85, 0.42, 0.7, 3500);
-    },
-    eraser: function (c, o, t) { // ластик 1: прежний
-      whoosh(c, o, t, 0.09, [1300, 1800, 1400], 1.05, 0.4, 1.5, 4000);
-      whoosh(c, o, t + 0.11, 0.1, [1300, 1800, 1300], 0.85, 0.4, 1.5, 4000);
-    },
-    eraser2: function (c, o, t) { // ластик 2: ниже и глуше
-      whoosh(c, o, t, 0.1, [850, 1250, 950], 1.0, 0.45, 1.2, 2500);
-      whoosh(c, o, t + 0.12, 0.11, [850, 1250, 900], 0.8, 0.45, 1.2, 2500);
-    },
-    eraser3: function (c, o, t) { // ластик 3: совсем мягкий, движения плавнее
-      whoosh(c, o, t, 0.12, [650, 1000, 750], 1.0, 0.5, 1, 1900);
-      whoosh(c, o, t + 0.14, 0.13, [650, 1000, 700], 0.8, 0.5, 1, 1900);
-    },
-    eraser4: function (c, o, t) { // ластик 4: одно мягкое движение
+    eraser4: function (c, o, t) { // ластик: одно мягкое движение (для сравнения)
       whoosh(c, o, t, 0.14, [800, 1200, 850], 0.85, 0.45, 1.1, 2400);
+    },
+    tap1: function (c, o, t) { // 1. мягкий щелчок
+      click(c, o, t, 0.012, 2000, 1.2, 0.5, 0.001);
+      tone(c, o, t, 1150, 0.02, 0.1);
+    },
+    tap2: function (c, o, t) { // 2. деревянный «тук», приглушённый
+      click(c, o, t, 0.004, 2200, 0.8, 0.09, 0.0008);
+      [[1, 1, 0.05], [2.57, 0.3, 0.025], [4.2, 0.12, 0.015]].forEach(function (p) { tone(c, o, t, 480 * p[0], p[2], 0.14 * p[1]); });
+    },
+    tap3: function (c, o, t) { // 3. капля «туп»
+      tone(c, o, t, 950, 0.045, 0.13, 600);
+    },
+    tap4: function (c, o, t) { // 4. подушечка пальца по стеклу — низкий глухой
+      tone(c, o, t, 230, 0.035, 0.17, 160);
+      click(c, o, t, 0.006, 1500, 0.8, 0.06, 0.001);
+    },
+    tap5: function (c, o, t) { // 5. камешек — светлый и крошечный
+      click(c, o, t, 0.006, 3500, 1.5, 0.32, 0.0008);
+      tone(c, o, t, 2600, 0.025, 0.09);
+      tone(c, o, t, 2600 * 1.52, 0.015, 0.045);
+    },
+    tap6: function (c, o, t) { // 6. пузырёк — вверх
+      tone(c, o, t, 600, 0.035, 0.13, 1100);
     }
   };
   function play(name, vol) {
@@ -128,17 +130,4 @@ var T = (function () {
     var b = e.target.closest ? e.target.closest("[data-s]") : null;
     if (b) T.play(b.getAttribute("data-s"), vol.value / 100);
   });
-  // полоса свайпа: как строка истории — провели влево и отпустили
-  var strip = document.getElementById("strip"), x0 = null, stripSound = "swipe";
-  document.addEventListener("change", function (e) { if (e.target.name === "sw") stripSound = e.target.value; });
-  strip.addEventListener("pointerdown", function (e) { x0 = e.clientX; });
-  strip.addEventListener("pointerup", function (e) {
-    if (x0 === null) return;
-    var dx = e.clientX - x0; x0 = null;
-    if (dx > -50) return;
-    var before = T.state();
-    T.play(stripSound, vol.value / 100);
-    setTimeout(function () { log.textContent = "Свайп: аудио было «" + before + "», стало «" + T.state() + "»"; }, 300);
-  });
-  strip.addEventListener("pointercancel", function () { x0 = null; });
 })();
