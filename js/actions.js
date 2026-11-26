@@ -28,7 +28,9 @@ function runAction(node, attr) {
   var fn = ACTIONS[node.getAttribute(attr)];
   if (fn) fn(node.getAttribute("data-arg"));
 }
-// Мягкий щелчок (sounds.js, Snd.tap) — у каждого нажатия кнопки; у этих свой звук или своя логика
+// Мягкий щелчок (sounds.js, Snd.tap) — у каждого нажатия кнопки, как и виброотклик (core.js, armHaptics);
+// у этих свой звук или своя логика. У выпадающих списков и полей дат нет ни того, ни другого: переключатель
+// поверх них не дал бы им открыться, а звук без вибрации кажется странным
 var OWN_SOUND = { save: 1, toggleSounds: 1 };
 document.addEventListener("click", function (e) {
   var b = e.target.closest ? e.target.closest("[data-act]") : null;
@@ -37,5 +39,5 @@ document.addEventListener("click", function (e) {
   runAction(b, "data-act");
 });
 document.addEventListener("change", function (e) {
-  if (e.target.getAttribute && e.target.getAttribute("data-change")) { Snd.tap(); runAction(e.target, "data-change"); }
+  if (e.target.getAttribute && e.target.getAttribute("data-change")) runAction(e.target, "data-change");
 });

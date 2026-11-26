@@ -6,7 +6,7 @@
 // Номер релиза страницы = число коммитов index.html на GitHub, включая тот, где он записан
 // (git rev-list --count HEAD -- index.html): +1 при каждом изменении страницы. Виден внизу формы
 // рядом с номером сервера — так понятно, что телефон открыл свежую страницу, а не старую из кэша.
-var PAGE_VERSION = 74;
+var PAGE_VERSION = 75;
 
 var state = { categories: [], currencies: [], merchants: {}, recent: [], prefill: null, editing: null, savedNew: null, sign: -1, categoryId: "", todayKey: "",
   loaded: false, loadError: "", offline: false, touched: false, smsText: "", smsFailShown: false };
@@ -42,6 +42,20 @@ function session(key, value) {
 // всплывает до кнопки и выполняет её действие как обычно. Тик — один на касание; на отпускание после свайпа
 // его не бывает. На Android — штатный navigator.vibrate через haptic(n). Выключается в «Настройках» («Виброотклик»).
 var HZ = '<input type="checkbox" switch class="hz" tabindex="-1" aria-hidden="true">';
+// Переключатель получают все кнопки с data-act — и нарисованные заново: следим за изменениями страницы.
+// Звук нажатия (Snd.tap) — у тех же кнопок, так что вибрация и звук всегда вместе.
+function armHaptics() {
+  var list = document.querySelectorAll("button[data-act]");
+  for (var i = 0; i < list.length; i++) {
+    var b = list[i];
+    if (b.lastElementChild && b.lastElementChild.classList.contains("hz")) continue;
+    var old = b.querySelector(".hz"); // текст кнопки поменяли после переключателя — переносим его в конец, поверх всего
+    if (old) { b.appendChild(old); continue; }
+    if (getComputedStyle(b).position === "static") b.style.position = "relative";
+    b.insertAdjacentHTML("beforeend", HZ);
+  }
+}
+if (window.MutationObserver) new MutationObserver(armHaptics).observe(document.documentElement, { childList: true, subtree: true });
 var HAPTIC_GAP_MS = 110; // между вибрациями двойного/тройного на Android
 function hapticsOn() { return store("haptics") !== "off"; }
 function haptic(n) {
