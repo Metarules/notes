@@ -12,8 +12,8 @@ function toggleSign() { setSign(-state.sign); formChanged(true); }
 // пока справочников нет: в сетке категорий — индикатор или ошибка с кнопкой «Повторить»
 function pendingBlock(cls) {
   // нет связи — о ней уже говорит плашка сверху, здесь только тихая пометка
-  if (state.offline) return '<div class="' + cls + '"><span class="muted">Загрузится, когда будет связь</span></div>';
-  if (state.loadError) return '<div class="' + cls + '"><span class="muted">' + esc(state.loadError) + '</span><button class="link inline" data-act="load">Повторить</button></div>';
+  if (state.offline) return '<div class="' + cls + '"><span class="muted">' + esc(t("form.loadWhenOnline")) + '</span></div>';
+  if (state.loadError) return '<div class="' + cls + '"><span class="muted">' + esc(state.loadError) + '</span><button class="link inline" data-act="load">' + esc(t("retry")) + '</button></div>';
   return '<div class="' + cls + '"><span class="spinner sm"></span></div>';
 }
 
@@ -26,8 +26,8 @@ function splitName(name) {
 function renderCategories() {
   if (!state.loaded) { el("catGrid").innerHTML = pendingBlock("pending"); updateSaveBtn(); return; }
   el("catGrid").innerHTML = state.categories.map(function (c, i) {
-    var n = splitName(c.categoryName);
-    return '<button class="chip' + (c.categoryId === state.categoryId ? " on" : "") + '" data-act="userPickCategory" data-arg="' + i + '">' +
+    var n = splitName(categoryLabel(c));
+    return '<button class="chip' + (sameId(c.categoryId, state.categoryId) ? " on" : "") + '" data-act="userPickCategory" data-arg="' + i + '">' +
       (n.emo ? '<span class="emo">' + esc(n.emo) + '</span>' : '') +
       '<span class="name">' + esc(n.label) + '</span></button>';
   }).join("");
@@ -36,9 +36,19 @@ function renderCategories() {
 }
 function pickCategory(id) { state.categoryId = id; renderCategories(); }
 function userPickCategory(i) { var c = state.categories[i]; if (!c) return; pickCategory(c.categoryId); formChanged(true); }
+// id категорий сравниваем как текст: из разных мест (таблица, магазины) он может прийти числом или строкой
+function sameId(a, b) { return String(a == null ? "" : a) === String(b == null ? "" : b) && a !== "" && a != null; }
+// Название категории на языке страницы: перевод из столбца en/de/sr/es листа Categories, а нет его — основное.
+// Значок (эмодзи) — из основного названия, в переводе его повторять не нужно.
+function categoryLabel(c) {
+  var tr = c && c.names && c.names[LANG];
+  if (!tr) return c ? c.categoryName : "";
+  var emo = splitName(c.categoryName).emo;
+  return emo && !splitName(tr).emo ? emo + " " + tr : tr;
+}
 function categoryName(id) {
-  var c = state.categories.filter(function (x) { return x.categoryId === id; })[0];
-  return c ? c.categoryName : "";
+  var c = state.categories.filter(function (x) { return sameId(x.categoryId, id); })[0];
+  return c ? categoryLabel(c) : "";
 }
 // список валют; пока его нет — «…» и выбор недоступен
 function renderCurrencies(selected) {
@@ -146,7 +156,7 @@ el("amount").addEventListener("paste", function (e) {
   if (/^\s*[-+]?[\d\s.,]+\s*$/.test(text)) return; // обычное число — вставляем как есть
   e.preventDefault();
   var r = parseBankText(text);
-  if (!r) { toast(state.loaded ? "В тексте нет суммы с валютой — введите вручную" : MSG_DICT_LOADING, false, TOAST_LONG_MS); return; }
+  if (!r) { toast(state.loaded ? t("form.pasteNoAmount") : t("form.dictLoading"), false, TOAST_LONG_MS); return; }
   fillForm({ amount: r.amount, currencyId: r.currencyId, categoryId: merchantCategory(r.merchant) });
   state.prefill = { merchant: r.merchant || "", fromClip: true }; // вставили из буфера — после сохранения очистим его
   state.touched = true;
@@ -154,21 +164,23 @@ el("amount").addEventListener("paste", function (e) {
 
 function readForm() {
   var amount = amountValue();
-  if (!amount) { toast("Введите сумму", true); el("amount").focus(); return null; }
-  if (!state.loaded) { toast(MSG_DICT_LOADING, true); return null; }
-  if (!state.categoryId) { toast("Выберите категорию", true); return null; }
+  if (!amount) { toast(t("form.enterAmount"), true); el("amount").focus(); return null; }
+  if (!state.loaded) { toast(t("form.dictLoading"), true); return null; }
+  if (!state.categoryId) { toast(t("form.pickCategory"), true); return null; }
   return { amount: state.sign * Math.abs(amount), currencyId: el("currency").value, categoryId: state.categoryId };
 }
 
 // изменить или удалить уже записанную операцию можно только со связью (очередь — только для новых)
-var NO_NET_EDIT = "Нет связи — изменить можно, когда появится связь";
-var NO_NET_DELETE = "Нет связи — удалить можно, когда появится связь";
-var NO_NET_EDIT_LOST = "Связь пропала — изменение не сохранилось";
+
+// «Сохранено: −13 EUR · 🍽 Кафе»
+function savedText(form) {
+  return t("form.saved", { amount: fmtNum(form.amount) + " " + form.currencyId, cat: categoryName(form.categoryId) || form.categoryId });
+}
 
 function save() {
   var form = readForm();
   if (!form) return;
-  if (state.editing && navigator.onLine === false) { toast(NO_NET_EDIT, false, TOAST_LONG_MS); return; }
+  if (state.editing && navigator.onLine === false) { toast(t("form.noNetEdit"), false, TOAST_LONG_MS); return; }
   setSaving(true);
   if (state.editing) {
     var ed = state.editing;
@@ -180,7 +192,7 @@ function save() {
     cancelEdit();
     var old = showEditLocally(ed, form);
     pendingEdits++;
-    toast("Сохранено: " + fmtNum(form.amount) + " " + form.currencyId + " · " + (categoryName(form.categoryId) || form.categoryId), false, TOAST_SHORT_MS);
+    toast(savedText(form), false, TOAST_SHORT_MS);
     call("apiUpdateTransaction", [ed.row, ed.expected, form], function (res, full) {
       pendingEdits--;
       if (full && full.recent) freshRecent = full.recent;
@@ -193,7 +205,7 @@ function save() {
     }, function (msg, kind) {
       pendingEdits--;
       undoEditLocally(old);
-      if (kind === "network") toast(NO_NET_EDIT_LOST, true); else toast("Изменение не сохранилось: " + msg, true);
+      if (kind === "network") toast(t("form.noNetEditLost"), true); else toast(t("form.editFailed", { msg: msg }), true);
     }, { keepalive: true });
     return;
   }
@@ -213,8 +225,7 @@ function save() {
   resetForm();
   clearUrl();
   setSaving(false);
-  toast(offline ? "Нет связи — сохранено на телефоне, отправится позже"
-    : "Сохранено: " + fmtNum(form.amount) + " " + form.currencyId + " · " + (categoryName(form.categoryId) || form.categoryId), false, offline ? TOAST_LONG_MS : TOAST_SHORT_MS);
+  toast(offline ? t("form.savedOffline") : savedText(form), false, offline ? TOAST_LONG_MS : TOAST_SHORT_MS);
   flushOutbox(true); // пробуем сразу, даже если плашка «Нет связи» ещё висит — связь могла вернуться
 }
 function clearClipboard() {
@@ -257,11 +268,11 @@ function startEdit(i) {
   window.scrollTo(0, 0);
   scheduleFit();
 }
-// Дата и время операции в шапке изменения. Подпись — «25 ноя, 12:00» (год — если не текущий);
+// Дата и время операции в шапке изменения. Подпись — «25 нояб., 12:00» по правилам языка (год — если не текущий);
 // у строк, введённых в таблицу только с датой, время не показываем, пока его не выбрали.
 function whenLabel(v, withTime) {
   var p = String(v).split("T"), d = p[0].split("-").map(Number);
-  var s = d[2] + " " + MON_GEN[d[1] - 1] + (d[0] !== new Date().getFullYear() ? " " + d[0] : "");
+  var s = fmtDayMonth(new Date(d[0], d[1] - 1, d[2], 12), d[0] !== new Date().getFullYear());
   return withTime ? s + ", " + p[1] : s;
 }
 function renderEditWhen() {

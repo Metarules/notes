@@ -41,18 +41,46 @@ function showDiag() {
   }
   var anchor = el("navRow").offsetParent ? el("navRow") : el("saveBtn");
   var lines = [
-    "Версии: страница " + PAGE_VERSION + ", сервер " + (state.serverVersion || "—"),
-    "Размеры окна (для настройки формы)",
+    t("diag.versions", { p: PAGE_VERSION, s: state.serverVersion || "—" }),
+    t("diag.sizes"),
     "ih " + window.innerHeight + " · iw " + window.innerWidth + " · screen " + screen.width + "×" + screen.height + " · dpr " + window.devicePixelRatio,
     "svh " + probe("height:100svh") + " · lvh " + probe("height:100lvh") + " · dvh " + probe("height:100dvh") +
       " · safe↓ " + probe("height:0;padding-bottom:env(safe-area-inset-bottom)") + " · safe↑ " + probe("height:0;padding-top:env(safe-area-inset-top)"),
-    "низ «Истории» " + Math.round(anchor.getBoundingClientRect().bottom) + " · запас под панель " + fitReserve() + " · кнопки " +
-      document.documentElement.style.getPropertyValue("--chip-h") + (el("catGrid").classList.contains("compact") ? " компакт" : ""),
-    "", "Журнал с момента открытия:"
-  ].concat(fitLog, ["", "Нажмите, чтобы закрыть"]);
+    t("diag.bottom", { b: Math.round(anchor.getBoundingClientRect().bottom), r: fitReserve(),
+      h: document.documentElement.style.getPropertyValue("--chip-h") + (el("catGrid").classList.contains("compact") ? " " + t("diag.compact") : "") }),
+    "", t("diag.log")
+  ].concat(fitLog, ["", t("diag.close")]);
   var d = document.createElement("div");
   d.className = "diag"; d.textContent = lines.join("\n");
   d.onclick = function () { d.remove(); };
   document.body.appendChild(d);
 }
+// Язык: «Как в системе» или один из пяти. При смене — перерисовываем всё, что видно, без перезагрузки страницы.
+function renderLangSelect() {
+  var sel = el("langSelect"), choice = langChoice();
+  sel.innerHTML = '<option value="auto">' + esc(t("set.langAuto")) + '</option>' + LANGS.map(function (l) {
+    return '<option value="' + l[0] + '">' + esc(l[1]) + '</option>';
+  }).join("");
+  sel.value = choice;
+}
+function setLang() {
+  var v = el("langSelect").value;
+  store("lang", v === "auto" ? null : v);
+  LANG = langChoice() === "auto" ? systemLang() : langChoice();
+  relocalize();
+}
+function relocalize() {
+  applyStaticI18n();
+  renderLangSelect();
+  renderVersion();
+  setSaving(saving);
+  if (state.loaded) { renderCategories(); renderCurrencies(el("currency").value); } else renderCategories();
+  updateNetBar();
+  refreshHistory();
+  renderMore();
+  updateKindLabel();
+  if (stats.pane === "stats" && !el("view-history").classList.contains("hidden")) loadStats();
+  if (state.editing) renderEditWhen();
+}
+
 function toggleTheme() { setTheme(currentTheme() === "dark" ? "light" : "dark"); }

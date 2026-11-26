@@ -26,7 +26,7 @@ function call(fn, args, onOk, onErr, opts) {
     setSaving(false);
   }
   var api = store("api"), token = store("token");
-  if (!isApiUrl(api) || !token) { noAccess(MSG_OPEN_VIA_SHORTCUT); return; }
+  if (!isApiUrl(api) || !token) { noAccess(t("err.openViaShortcut")); return; }
   var body = API[fn].apply(null, args || []);
   body.action = "page";
   body.token = token;
@@ -37,7 +37,7 @@ function call(fn, args, onOk, onErr, opts) {
     .then(function (r) {
       // Google при сбое (квота, ошибка скрипта) отвечает HTML-страницей, а не JSON
       return r.text().then(function (text) {
-        try { return JSON.parse(text); } catch (e) { throw { server: "Сервер ответил ошибкой" + (r.status !== 200 ? " (HTTP " + r.status + ")" : "") + " — попробуйте позже" }; }
+        try { return JSON.parse(text); } catch (e) { throw { server: t("err.httpPage", { http: r.status !== 200 ? " (HTTP " + r.status + ")" : "" }) }; }
       });
     })
     .then(function (res) {
@@ -51,17 +51,17 @@ function call(fn, args, onOk, onErr, opts) {
       if (res && res.auth === false) {
         store("token", null); // ключ не подошёл — забываем его и кэш данных
         store("init", null);
-        noAccess("Нет доступа. " + MSG_OPEN_VIA_SHORTCUT);
+        noAccess(t("err.noAccess"));
         return;
       }
-      fail((res && res.error) || "Ошибка сервера");
+      fail(serverError(res) || t("err.server")); // текст по коду ошибки — на языке страницы
     })
     .catch(function (e) {
       clearTimeout(timer);
       if (e && e.server) { setOnline(true); fail(e.server); return; } // ответила страница ошибки Google — связь есть
       setOnline(false);
-      if (e && e.name === "AbortError") fail("Сервер не ответил — попробуйте ещё раз", "network");
-      else fail("Нет связи с сервером", "network");
+      if (e && e.name === "AbortError") fail(t("err.timeout"), "network");
+      else fail(t("err.network"), "network");
     });
 }
 
@@ -75,16 +75,12 @@ function formChanged(byUser) {
   if (byUser) state.touched = true;
 }
 
-// тексты, которые встречаются в нескольких местах
 // номера релизов на экране «Настройки»; номер сервера приходит в init (serverVersion), до ответа — из кэша или «—»
 function renderVersion() {
   el("verPage").textContent = PAGE_VERSION;
   el("verServer").textContent = state.serverVersion || "—";
 }
 
-var MSG_OPEN_VIA_SHORTCUT = "Откройте форму через шорткат «Бюджет»";
-var MSG_DICT_LOADING = "Справочники ещё загружаются — попробуйте через пару секунд";
-var MSG_STATS_WAIT_NET = "Статистика загрузится, когда будет связь";
 
 function noAccess(text) {
   el("app").classList.add("hidden");

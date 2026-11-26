@@ -48,7 +48,7 @@ function applyPrefill() {
       // подсказываем, только если это явно сообщение банка (например, банк поменял формат);
       // любой другой текст из буфера молча оставляет форму пустой
       state.smsFailShown = true;
-      toast("Не получилось разобрать сообщение банка — введите сумму вручную", false, TOAST_LONG_MS);
+      toast(t("form.smsFail"), false, TOAST_LONG_MS);
     }
   }
   if (!p) return;
@@ -80,7 +80,7 @@ function applyData(data) {
   state.loaded = true;
   state.loadError = "";
   renderCurrencies(cur);
-  if (!state.categories.some(function (c) { return c.categoryId === state.categoryId; })) state.categoryId = "";
+  if (!state.categories.some(function (c) { return sameId(c.categoryId, state.categoryId); })) state.categoryId = "";
   renderCategories();
   hist.done = false; hist.next = 0; hist.failed = false;
   if (!state.editing && !historyBusy() && !swipe.openRow && !swipe.row) renderHistory(data.recent || []);
@@ -115,7 +115,7 @@ function load() {
 
 // форма показывается сразу; чего ещё нет — крутится индикатор, пока данные грузятся фоном
 function boot() {
-  if (!hasAccess()) { noAccess(MSG_OPEN_VIA_SHORTCUT); return; }
+  if (!hasAccess()) { noAccess(t("err.openViaShortcut")); return; }
   el("loader").classList.add("hidden");
   el("app").classList.remove("hidden");
   setSign(-1);
@@ -132,6 +132,10 @@ function boot() {
 window.addEventListener("hashchange", function () { location.reload(); });
 
 applyTheme();
+applyStaticI18n();
+renderLangSelect();
+setSaving(false);
+updateKindLabel();
 renderVersion();
 lastSize = { w: window.innerWidth, h: window.innerHeight };
 boot();

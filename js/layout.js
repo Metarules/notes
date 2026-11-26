@@ -78,7 +78,32 @@ function fitLayout() {
   // обычные кнопки (эмодзи над подписью), а если не помещаются даже самые низкие — компактные (эмодзи слева)
   var left = fit(false);
   if (left < 0) left = fit(true);
-  fitNote("подгонка " + root.style.getPropertyValue("--chip-h") + (grid.classList.contains("compact") ? " компакт" : "") + " запас " + Math.round(left) + " под панель " + reserve);
+  fitChipNames();
+  fitNote(t("diag.fit", { h: root.style.getPropertyValue("--chip-h") + (grid.classList.contains("compact") ? " " + t("diag.compact") : ""), l: Math.round(left), r: reserve }));
+}
+
+// Длинное слово в подписи кнопки (Entertainment, Lebensmittel, Развлечения) не делим посреди слова:
+// сначала чуть уменьшаем шрифт этой подписи, не мельче CHIP_NAME_MIN_PX. Только если и так не входит —
+// слово переносится по слогам (или по буквам, если язык этого не умеет) — см. .chip .name в стилях.
+var CHIP_NAME_MIN_PX = 10.5;
+function fitChipNames() {
+  var ctx = fitChipNames.ctx || (fitChipNames.ctx = document.createElement("canvas").getContext("2d"));
+  [].forEach.call(document.querySelectorAll("#catGrid .chip"), function (chip) {
+    var n = chip.querySelector(".name"), emo = chip.querySelector(".emo");
+    if (!n) return;
+    n.style.fontSize = "";
+    var cs = getComputedStyle(n), ccs = getComputedStyle(chip), base = parseFloat(cs.fontSize), size = base;
+    // ширина под подпись: внутренняя ширина кнопки, а в компактном виде — минус значок слева
+    var avail = chip.clientWidth - parseFloat(ccs.paddingLeft) - parseFloat(ccs.paddingRight);
+    if (emo && ccs.flexDirection === "row") avail -= emo.offsetWidth + (parseFloat(ccs.columnGap) || 0);
+    var words = n.textContent.split(/\s+/).filter(Boolean);
+    function widest() {
+      ctx.font = cs.fontWeight + " " + size + "px " + cs.fontFamily;
+      return Math.max.apply(null, words.map(function (w) { return ctx.measureText(w).width; }));
+    }
+    while (size - 0.5 >= CHIP_NAME_MIN_PX && widest() > avail) size -= 0.5;
+    if (size < base) n.style.fontSize = size + "px";
+  });
 }
 
 // поворот экрана и смена ширины — пересчёт; изменение высоты при прокрутке (панели браузера) — нет
@@ -90,4 +115,4 @@ window.addEventListener("resize", function () {
   if (w !== lastSize.w || (window.pageYOffset === 0 && Math.abs(hgt - lastSize.h) > FIT_RESIZE_MIN_PX)) { lastSize = { w: w, h: hgt }; fitForce = true; scheduleFit(); }
 });
 // в конце «устаканивания» — последняя сверка (если высота поменялась без события resize)
-setTimeout(function () { fitNote("конец"); fitForce = true; scheduleFit(); }, FIT_SETTLE_MS);
+setTimeout(function () { fitNote(t("diag.end")); fitForce = true; scheduleFit(); }, FIT_SETTLE_MS);

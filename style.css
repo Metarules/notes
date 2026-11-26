@@ -35,8 +35,10 @@ button { font-family:inherit; cursor:pointer; }
 .editbar .back { border:0; background:transparent; color:var(--accent); font-size:22px; padding:4px 10px 4px 2px; }
 .editbar .title { font-size:16px; font-weight:600; }
 /* шапка изменения: «Изменение» и справа дата-время операции — кнопкой-«таблеткой» (видно, что её можно нажать) */
-#editBar .title { flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.when-pill { position:relative; flex:0 0 auto; display:inline-flex; align-items:center; gap:6px; padding:8px 12px; border-radius:999px;
+/* заголовок не обрезаем; если вместе с датой не помещается (узкий экран, длинное слово) — дата уходит на строку ниже, вправо */
+#editBar { flex-wrap:wrap; row-gap:4px; }
+#editBar .title { flex:1 1 auto; white-space:nowrap; }
+.when-pill { position:relative; flex:0 0 auto; margin-left:auto; display:inline-flex; align-items:center; gap:6px; padding:8px 12px; border-radius:999px;
   background:var(--accent-soft); color:var(--accent); font-size:15px; font-weight:600; white-space:nowrap; cursor:pointer; }
 .when-pill svg { width:16px; height:16px; flex:0 0 auto; }
 /* дату поменяли, но ещё не сохранили — заливка цветом */
@@ -68,11 +70,14 @@ button { font-family:inherit; cursor:pointer; }
 .cur-panel .check { flex:0 0 20px; color:var(--text); font-size:18px; font-weight:600; text-align:center; }
 .cur-panel button:active { background:var(--line); }
 /* сетка категорий */
-.grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-top:10px; }
+/* minmax(0, 1fr): колонки делят ширину поровну, даже если в названии длинное слово (Abonnements, Suscripciones) */
+.grid { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:8px; margin-top:10px; }
 .chip { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; min-height:var(--chip-h, 60px); padding:4px; border:1px solid var(--line); border-radius:12px;
   background:var(--field); color:var(--text); }
 .chip .emo { font-size:22px; line-height:1; }
-.chip .name { font-size:13px; line-height:1.2; text-align:center; }
+/* длинное слово переносится по слогам (язык страницы — в <html lang>), а если язык так не умеет — просто по буквам */
+.chip { min-width:0; }
+.chip .name { max-width:100%; font-size:13px; line-height:1.2; text-align:center; overflow-wrap:anywhere; -webkit-hyphens:auto; hyphens:auto; }
 .chip.on { border-color:var(--accent); background:var(--accent-soft); box-shadow:inset 0 0 0 1px var(--accent); }
 .btn { width:100%; padding:13px; border:0; border-radius:12px; background:var(--accent); color:#fff; font-size:17px; margin-top:10px; transition:background .15s, color .15s; }
 /* пока сумма и категория не введены — кнопка серая и не нажимается; во время отправки — синяя с индикатором */
@@ -86,9 +91,9 @@ button { font-family:inherit; cursor:pointer; }
 /* адаптивность: широкий экран (iPad, телефон боком) — шире колонка и 4 категории в ряд;
    самые узкие (320 точек) — шрифт мельче, чтобы длинные названия не переносились.
    Высоту кнопок категорий подбирает fitLayout() под высоту экрана. */
-@media (min-width: 560px) { .wrap { max-width:600px; } .grid { grid-template-columns:repeat(4, 1fr); } }
+@media (min-width: 560px) { .wrap { max-width:600px; } .grid { grid-template-columns:repeat(4, minmax(0, 1fr)); } }
 /* компактные кнопки категорий для коротких экранов: эмодзи слева от подписи */
-.grid.compact .chip { flex-direction:row; gap:5px; padding:4px 6px; }
+.grid.compact .chip { flex-direction:row; gap:4px; padding:4px 5px; }
 .grid.compact .chip .emo { font-size:16px; }
 .grid.compact .chip .name { font-size:12px; text-align:left; }
 @media (max-width: 340px) { .wrap { padding-left:10px; padding-right:10px; } .chip .name { font-size:11px; } .amount-field input { font-size:20px; } }
@@ -186,3 +191,9 @@ button { font-family:inherit; cursor:pointer; }
 .setrow .val { color:var(--muted); }
 .setrow .chev { color:var(--muted); font-size:20px; line-height:1; }
 button.setrow { width:100%; border:0; background:transparent; text-align:left; font-family:inherit; }
+/* выбор языка: системный список (на iPhone — колесо), выглядит как значение строки со стрелкой */
+.sel-wrap { display:flex; align-items:center; gap:4px; min-width:0; color:var(--muted); }
+.set-select { min-width:0; max-width:180px; border:0; padding:6px 0; background:transparent; color:var(--muted); font:inherit; font-size:16px;
+  text-align:right; text-align-last:right; direction:rtl; -webkit-appearance:none; appearance:none; cursor:pointer; }
+.set-select option { direction:ltr; }
+.sel-wrap .chev { color:var(--muted); font-size:20px; line-height:1; }

@@ -8,15 +8,9 @@ function setOnline(on) {
   if (changed && !state.loaded) { renderCategories(); renderHistory(null); }
   if (changed && on) setTimeout(flushOutbox, 0); // связь вернулась — отправляем отложенное
 }
-function plural(n, one, few, many) {
-  var m10 = n % 10, m100 = n % 100;
-  return m10 === 1 && m100 !== 11 ? one : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? few : many;
-}
 function updateNetBar() {
   var n = outbox().filter(function (x) { return !x.error; }).length;
-  el("netText").textContent = n
-    ? n + " " + plural(n, "операция ждёт", "операции ждут", "операций ждут") + " отправки"
-    : "Операции сохранятся на телефоне";
+  el("netText").textContent = n ? tn("net.pending", n) : t("net.savedOnPhone");
   var wasHidden = el("netBar").classList.contains("hidden");
   el("netBar").classList.toggle("hidden", !state.offline);
   if (wasHidden === state.offline) scheduleFit(); // плашка появилась или исчезла — меняется место под кнопки
@@ -75,7 +69,7 @@ function flushCancels() {
     if (kind !== "network") { // сервер отказал — повтор не поможет; операция останется в истории, удалить можно обычным свайпом
       cancels(cancels().filter(function (x) { return x !== id; }));
       refreshHistory();
-      toast("Не удалось удалить на сервере: " + msg, true);
+      toast(t("q.cancelFailed", { msg: msg }), true);
     }
   }, { keepalive: true });
 }
@@ -91,7 +85,7 @@ function flushOutbox(now) {
   if (flushing || (state.offline && !now) || navigator.onLine === false) return;
   var items = outbox().filter(function (x) { return !x.error; }).slice(0, SEND_BATCH);
   if (!items.length) {
-    if (flushedCount) { toast("Отправлено с телефона: " + flushedCount + " " + plural(flushedCount, "операция", "операции", "операций")); flushedCount = 0; }
+    if (flushedCount) { toast(tn("q.sent", flushedCount)); flushedCount = 0; }
     return;
   }
   flushing = true;
@@ -108,10 +102,10 @@ function flushOutbox(now) {
       var r = byId[x.form.id];
       if (!r) return x;                         // не была в этой пачке — останется в очереди
       if (r.ok) { if (x.off && !r.cancelled) flushedCount++; return null; } // записана (или отменена удалением) — убираем из очереди
-      errors.push(r.error);                       // сервер отказал (например, категорию удалили) — повтор не поможет
-      return { form: x.form, error: r.error };
+      errors.push(serverError(r));                // сервер отказал (например, категорию удалили) — повтор не поможет
+      return { form: x.form, error: r.error, code: r.code || "" }; // code — чтобы показать причину на языке страницы
     }).filter(Boolean));
-    if (errors.length) toast((errors.length === 1 ? "Операция не записалась: " : "Не записались операции: " + errors.length + " — ") + errors[0], true);
+    if (errors.length) toast(errors.length === 1 ? t("q.addFailedOne", { msg: errors[0] }) : t("q.addFailedMany", { n: errors.length, msg: errors[0] }), true);
     // сервер ставит операцию на место по дате: строки ниже сдвигаются — поправляем номера у подгруженных старых
     ((res && res.results) || []).forEach(function (r) { if (r.ok && r.inserted) shiftRows(r.row); });
     if (full && full.recent) state.recent = withOlder(full.recent);
@@ -127,7 +121,7 @@ function flushOutbox(now) {
     outbox(outbox().map(function (x) { return ids.indexOf(x.form.id) > -1 ? Object.assign({}, x, { off: true }) : x; }));
     updateNetBar();
     refreshHistory();
-    if (kind !== "network") toast("Не отправилось: " + msg + ". Операции остались на телефоне", true);
+    if (kind !== "network") toast(t("q.sendFailed", { msg: msg }), true);
   }, { keepalive: true });
 }
 // телефон снова в сети — сразу пробуем загрузить; пропала сеть — сразу показываем плашку
