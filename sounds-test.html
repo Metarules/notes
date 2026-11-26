@@ -17,6 +17,7 @@ button:last-child { margin-bottom:0; } button.del { background:#dc2626; }
 button span { opacity:.75; font-size:14px; }
 input[type=range] { width:100%; }
 .strip { padding:22px 14px; border-radius:12px; background:#e5e7eb; text-align:center; font-size:16px; touch-action:pan-y; -webkit-user-select:none; user-select:none; }
+.pick { display:grid; gap:10px; margin-bottom:12px; font-size:16px; } .pick input { margin-right:8px; }
 .hint { display:block; font-size:13px; color:#6b7280; margin-top:8px; }
 .vol { display:flex; justify-content:space-between; font-size:15px; margin-bottom:6px; }
 </style>
@@ -32,22 +33,24 @@ input[type=range] { width:100%; }
 
 <h2>Звук на свайпе</h2>
 <div class="case">
+<div class="pick">
+<label><input type="radio" name="sw" value="swipe" checked> 1. Прежний</label>
+<label><input type="radio" name="sw" value="swipe2"> 2. Мягче</label>
+<label><input type="radio" name="sw" value="swipe3"> 3. Ещё мягче, низкий</label>
+<label><input type="radio" name="sw" value="swipe4"> 4. Мягкий, короткий</label>
+</div>
 <div id="strip" class="strip">← Проведите пальцем влево и отпустите</div>
-<span class="hint">Сначала сразу после любого нажатия, потом — подождав секунд 5 без касаний. Ниже появится, проснулось ли аудио.</span>
 </div>
 
-<h2>Для нажатия «Удалить»</h2>
+<h2>Для нажатия «Удалить» — ластик</h2>
 <div class="case">
-<button class="del" data-s="tear">A. Оторвать чек <span>резкий шорох</span></button>
-<button class="del" data-s="stamp">B. Штамп <span>«Аннулировано»</span></button>
-<button class="del" data-s="beep">C. Кассовый терминал <span>«бип-буп» вниз</span></button>
-<button class="del" data-s="pen">D. Зачеркнуть ручкой <span>штрих</span></button>
-<button class="del" data-s="bin">E. Скомкать и в корзину <span>хруст + стук</span></button>
-<button class="del" data-s="pop">F. Мягкий «поп» <span>коротко</span></button>
-<button class="del" data-s="eraser">G. Ластик <span>два движения</span></button>
+<button class="del" data-s="eraser">1. Прежний <span>для сравнения</span></button>
+<button class="del" data-s="eraser2">2. Ниже и глуше <span>два движения</span></button>
+<button class="del" data-s="eraser3">3. Совсем мягкий <span>плавнее</span></button>
+<button class="del" data-s="eraser4">4. Одно движение <span>мягкое</span></button>
 </div>
 
 <p id="log"></p>
-<script src="sounds-test.js?v=5"></script>
+<script src="sounds-test.js?v=6"></script>
 </body>
 </html>

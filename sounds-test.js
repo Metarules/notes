@@ -75,35 +75,29 @@ var T = (function () {
     swipe: function (c, o, t) { // взмах — для свайпа
       whoosh(c, o, t, 0.3, [700, 2200, 900], 0.9, 0.45);
     },
-    tear: function (c, o, t) { // A. оторвать чек
-      click(c, o, t, 0.16, 3200, 0.9, 0.18, 0.03);
-      grains(c, o, t, 0.17, 70, 0.6, 1500, 6500, 1.3);
+    swipe2: function (c, o, t) { // свайп 2: мягче — ниже и без верхнего шипения
+      whoosh(c, o, t, 0.3, [500, 1500, 700], 0.85, 0.45, 0.7, 3500);
     },
-    stamp: function (c, o, t) { // B. штамп «Аннулировано»
-      tone(c, o, t, 150, 0.07, 0.28, 85);
-      click(c, o, t, 0.035, 900, 0.7, 0.35, 0.001);
-      click(c, o, t + 0.004, 0.015, 3200, 1, 0.18, 0.001);
+    swipe3: function (c, o, t) { // свайп 3: ещё мягче, низкий и чуть длиннее
+      whoosh(c, o, t, 0.34, [380, 1050, 480], 0.8, 0.5, 0.6, 2400);
     },
-    beep: function (c, o, t) { // C. кассовый терминал: мягкий «бип-буп» вниз
-      tone(c, o, t, 1320, 0.07, 0.15, null, "triangle", 0.006);
-      tone(c, o, t + 0.1, 880, 0.11, 0.15, null, "triangle", 0.006);
+    swipe4: function (c, o, t) { // свайп 4: мягкий и короткий
+      whoosh(c, o, t, 0.22, [550, 1500, 750], 0.85, 0.42, 0.7, 3500);
     },
-    pen: function (c, o, t) { // D. зачеркнуть ручкой
-      whoosh(c, o, t, 0.2, [2000, 2900, 2300], 1.1, 0.3, 2.2, 6000);
-      grains(c, o, t, 0.2, 30, 0.12, 2500, 6000, 1);
-    },
-    bin: function (c, o, t) { // E. скомкать и в корзину
-      grains(c, o, t, 0.13, 45, 0.45, 1500, 6000, 1);
-      tone(c, o, t + 0.21, 170, 0.07, 0.28, 100);
-      click(c, o, t + 0.21, 0.03, 700, 0.8, 0.3, 0.001);
-    },
-    pop: function (c, o, t) { // F. мягкий «поп»
-      tone(c, o, t, 420, 0.06, 0.22, 1150);
-      click(c, o, t, 0.006, 2500, 1, 0.12, 0.001);
-    },
-    eraser: function (c, o, t) { // G. ластик: два быстрых движения
+    eraser: function (c, o, t) { // ластик 1: прежний
       whoosh(c, o, t, 0.09, [1300, 1800, 1400], 1.05, 0.4, 1.5, 4000);
       whoosh(c, o, t + 0.11, 0.1, [1300, 1800, 1300], 0.85, 0.4, 1.5, 4000);
+    },
+    eraser2: function (c, o, t) { // ластик 2: ниже и глуше
+      whoosh(c, o, t, 0.1, [850, 1250, 950], 1.0, 0.45, 1.2, 2500);
+      whoosh(c, o, t + 0.12, 0.11, [850, 1250, 900], 0.8, 0.45, 1.2, 2500);
+    },
+    eraser3: function (c, o, t) { // ластик 3: совсем мягкий, движения плавнее
+      whoosh(c, o, t, 0.12, [650, 1000, 750], 1.0, 0.5, 1, 1900);
+      whoosh(c, o, t + 0.14, 0.13, [650, 1000, 700], 0.8, 0.5, 1, 1900);
+    },
+    eraser4: function (c, o, t) { // ластик 4: одно мягкое движение
+      whoosh(c, o, t, 0.14, [800, 1200, 850], 0.85, 0.45, 1.1, 2400);
     }
   };
   function play(name, vol) {
@@ -135,14 +129,15 @@ var T = (function () {
     if (b) T.play(b.getAttribute("data-s"), vol.value / 100);
   });
   // полоса свайпа: как строка истории — провели влево и отпустили
-  var strip = document.getElementById("strip"), x0 = null;
+  var strip = document.getElementById("strip"), x0 = null, stripSound = "swipe";
+  document.addEventListener("change", function (e) { if (e.target.name === "sw") stripSound = e.target.value; });
   strip.addEventListener("pointerdown", function (e) { x0 = e.clientX; });
   strip.addEventListener("pointerup", function (e) {
     if (x0 === null) return;
     var dx = e.clientX - x0; x0 = null;
     if (dx > -50) return;
     var before = T.state();
-    T.play("swipe", vol.value / 100);
+    T.play(stripSound, vol.value / 100);
     setTimeout(function () { log.textContent = "Свайп: аудио было «" + before + "», стало «" + T.state() + "»"; }, 300);
   });
   strip.addEventListener("pointercancel", function () { x0 = null; });
