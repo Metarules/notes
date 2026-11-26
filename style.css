@@ -16,15 +16,14 @@ input, select, textarea { font-family:inherit; } /* округлый шрифт 
 html { height:100%; overflow:hidden; overscroll-behavior:none; }
 body { height:100%; height:100lvh; }
 .scroller { height:100%; overflow-x:hidden; overflow-y:auto; -webkit-overflow-scrolling:touch; }
-/* фон с котиками (вариант B) — на подложке под содержимым: прокручивается вместе с ним и не «рябит» за карточками.
-   Цвет и бледность заданы в самих картинках (своя для каждой темы); выключается в «Настройках» вместе с мордочками */
-/* Тот же узор и у самой области: при пружине у края (bounce) подложка с содержимым отъезжает, и в открывшейся полосе
-   виден неподвижный узор области, а не пустота. Подложка непрозрачная — в покое два узора не накладываются */
-.scroller, .scroll-bg { background-color:var(--bg); background-image:url(img/cats-light.svg?v=57); background-size:150px 150px; background-repeat:repeat; }
+/* фон с котиками (вариант B) — у самой прокручиваемой области и неподвижен, как обои чата: карточки едут поверх.
+   Один слой узора — нигде не обрывается (он во весь экран, в том числе под панелями Safari) и не двоится,
+   в том числе когда содержимое пружинит у края. Цвет и бледность заданы в самих картинках (своя для каждой темы) */
+.scroller { background-color:var(--bg); background-image:url(img/cats-light.svg?v=57); background-size:150px 150px; background-repeat:repeat; }
 .scroll-bg { min-height:100%; }
-html[data-theme="dark"] .scroller, html[data-theme="dark"] .scroll-bg { background-image:url(img/cats-dark.svg?v=57); }
+html[data-theme="dark"] .scroller { background-image:url(img/cats-dark.svg?v=57); }
 /* котики выключены в «Настройках» — нет ни узора, ни мордочек на ошибках */
-html[data-cats="off"] .scroller, html[data-cats="off"] .scroll-bg { background-image:none; }
+html[data-cats="off"] .scroller { background-image:none; }
 html[data-cats="off"] .cat-ill, html[data-cats="off"] .nb-cat { display:none !important; }
 /* котик на ошибках (catFace в core.js): линии — приглушённые, слеза — цвет кнопок */
 .cat-ill { display:flex; justify-content:center; color:var(--illus); }
