@@ -240,7 +240,7 @@ button.setrow { width:100%; border:0; background:transparent; text-align:left; f
 .set-select { min-width:0; max-width:180px; border:0; padding:6px 0; background:transparent; color:var(--muted); font:inherit; font-size:16px;
   text-align:right; text-align-last:right; direction:rtl; -webkit-appearance:none; appearance:none; cursor:pointer; }
 .set-select option { direction:ltr; }
-/* без синей рамки фокуса, которую iOS рисует вокруг списка при нажатии; фокус с клавиатуры — цветом значения */
-.set-select:focus { outline:none; }
-.set-select:focus-visible { color:var(--accent); }
+/* без синей рамки фокуса, которую iOS рисует вокруг списка при нажатии (и без подсветки цветом:
+   iOS считает нажатие «фокусом с клавиатуры», и значение мигало синим после выбора) */
+.set-select:focus, .set-select:focus-visible { outline:none; }
 .sel-wrap .chev { color:var(--muted); font-size:20px; line-height:1; }
