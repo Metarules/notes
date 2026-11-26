@@ -64,6 +64,28 @@ var T = (function () {
     g.gain.setValueAtTime(0.00001, t); g.gain.setValueCurveAtTime(curve, t, d);
     s.connect(bp); bp.connect(l); l.connect(g); g.connect(out); s.start(t, Math.random()); s.stop(t + d + 0.05);
   }
+  var BELL = [[1, 1, 1], [2.32, 0.45, 0.7], [4.25, 0.25, 0.4], [6.63, 0.12, 0.25], [9.38, 0.06, 0.15]];
+  function bell(c, out, t, f, peak, d, strike) {
+    if (strike) click(c, out, t, 0.006, 7000, 0.6, peak * strike, 0.001);
+    BELL.forEach(function (p) {
+      var beat = rnd(1.2, 3.5);
+      tone(c, out, t, f * p[0], d * p[2], peak * p[1] * 0.6);
+      tone(c, out, t, f * p[0] + beat, d * p[2] * 0.9, peak * p[1] * 0.45);
+    });
+  }
+  // стук: короткий импульс шума через резонаторы — так звучит сам предмет. modes: [частота, добротность, громкость]
+  function knock(c, out, t, modes, peak, imp) {
+    var s = c.createBufferSource(), g = c.createGain();
+    s.buffer = noise(c); env(g, t, 0.0005, 1, imp || 0.003);
+    s.connect(g);
+    modes.forEach(function (m) {
+      var bp = c.createBiquadFilter(), mg = c.createGain();
+      bp.type = "bandpass"; bp.frequency.value = m[0] * rnd(0.99, 1.01); bp.Q.value = m[1];
+      mg.gain.value = peak * m[2] * Math.sqrt(m[1]); // узкая полоса тише — подравниваем
+      g.connect(bp); bp.connect(mg); mg.connect(out);
+    });
+    s.start(t, Math.random() * 0.5); s.stop(t + 0.05);
+  }
   // россыпь крошечных щелчков; shape > 1 — плотнее к концу, < 1 — к началу
   function grains(c, out, t, d, n, peak, fLo, fHi, shape) {
     for (var i = 0; i < n; i++) {
@@ -78,28 +100,25 @@ var T = (function () {
     eraser4: function (c, o, t) { // ластик: одно мягкое движение (для сравнения)
       whoosh(c, o, t, 0.14, [800, 1200, 850], 0.85, 0.45, 1.1, 2400);
     },
-    tap1: function (c, o, t) { // 1. мягкий щелчок
-      click(c, o, t, 0.012, 2000, 1.2, 0.5, 0.001);
-      tone(c, o, t, 1150, 0.02, 0.1);
+    tap1: function (c, o, t) { // 1. щелчок из звука кассы
+      click(c, o, t, 0.03, 1800, 1.2, 0.45);
     },
-    tap2: function (c, o, t) { // 2. деревянный «тук», приглушённый
-      click(c, o, t, 0.004, 2200, 0.8, 0.09, 0.0008);
-      [[1, 1, 0.05], [2.57, 0.3, 0.025], [4.2, 0.12, 0.015]].forEach(function (p) { tone(c, o, t, 480 * p[0], p[2], 0.14 * p[1]); });
+    tap2: function (c, o, t) { // 2. крошечный «тинь» того же колокольчика
+      bell(c, o, t, 2093, 0.07, 0.16);
     },
-    tap3: function (c, o, t) { // 3. капля «туп»
-      tone(c, o, t, 950, 0.045, 0.13, 600);
+    tap3: function (c, o, t) { // 3. касание бумаги — миниатюра ластика
+      whoosh(c, o, t, 0.045, [900, 1400, 950], 0.6, 0.3, 1.1, 2500);
     },
-    tap4: function (c, o, t) { // 4. подушечка пальца по стеклу — низкий глухой
-      tone(c, o, t, 230, 0.035, 0.17, 160);
-      click(c, o, t, 0.006, 1500, 0.8, 0.06, 0.001);
+    tap4: function (c, o, t) { // 4. стук пальцем по дереву
+      knock(c, o, t, [[520, 25, 1], [1380, 30, 0.45], [2350, 35, 0.2]], 3.6);
     },
-    tap5: function (c, o, t) { // 5. камешек — светлый и крошечный
-      click(c, o, t, 0.006, 3500, 1.5, 0.32, 0.0008);
-      tone(c, o, t, 2600, 0.025, 0.09);
-      tone(c, o, t, 2600 * 1.52, 0.015, 0.045);
+    tap5: function (c, o, t) { // 5. костяшкой по столу — ниже и глуше
+      knock(c, o, t, [[190, 12, 1], [430, 18, 0.5], [950, 25, 0.2]], 6, 0.004);
+      click(c, o, t, 0.004, 2500, 0.8, 0.05, 0.0008);
     },
-    tap6: function (c, o, t) { // 6. пузырёк — вверх
-      tone(c, o, t, 600, 0.035, 0.13, 1100);
+    tap6: function (c, o, t) { // 6. маленькая касса: щелчок и едва слышный «тинь»
+      click(c, o, t, 0.025, 1800, 1.2, 0.38);
+      bell(c, o, t + 0.035, 2093, 0.06, 0.14);
     }
   };
   function play(name, vol) {
