@@ -93,7 +93,9 @@ function renderVersion() {
 function noAccess(text) {
   el("app").classList.add("hidden");
   el("loader").classList.remove("hidden");
+  el("loader").classList.add("denied"); // карточка с сердитым котиком
   el("spinner").classList.add("hidden");
   el("retryBtn").classList.add("hidden");
+  el("loaderCat").innerHTML = catFace("angry", 64);
   el("loaderText").textContent = text;
 }

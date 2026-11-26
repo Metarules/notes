@@ -6,7 +6,7 @@
 // Номер релиза страницы = число коммитов index.html на GitHub, включая тот, где он записан
 // (git rev-list --count HEAD -- index.html): +1 при каждом изменении страницы. Виден внизу формы
 // рядом с номером сервера — так понятно, что телефон открыл свежую страницу, а не старую из кэша.
-var PAGE_VERSION = 50;
+var PAGE_VERSION = 51;
 
 var state = { categories: [], currencies: [], merchants: {}, recent: [], prefill: null, editing: null, savedNew: null, sign: -1, categoryId: "", todayKey: "",
   loaded: false, loadError: "", offline: false, touched: false, smsText: "", smsFailShown: false };
@@ -30,6 +30,30 @@ function session(key, value) {
     if (value === undefined) return sessionStorage.getItem(key);
     if (value === null) sessionStorage.removeItem(key); else sessionStorage.setItem(key, value);
   } catch (e) { return null; }
+}
+
+// ---------- котик на ошибках ----------
+// Одна мордочка-смайлик (голова с ушками, носик, рот «ω», усы); различаются только глаза и мелочи:
+// sleep — нет связи (спит, «z»), cry — сервер не ответил (плачет, синяя слеза), angry — нет доступа (сердитый прищур).
+// Цвет линий — currentColor (задаёт место, где мордочка стоит), слеза — цвет кнопок (.cat-tear в стилях).
+var CAT_EYES = {
+  sleep: '<path d="M21 35 q3.5 2.6 7 0"/><path d="M36 35 q3.5 2.6 7 0"/>',
+  cry: '<path d="M21 35.6 q3.5 -2.6 7 0"/><path d="M36 35.6 q3.5 -2.6 7 0"/>',
+  angry: '<path d="M21 33 L28 35.8 Q27.4 38.4 24.6 38.4 Q21.6 38.2 21 33 Z" fill="currentColor" stroke-width="1.2"/>' +
+    '<path d="M43 33 L36 35.8 Q36.6 38.4 39.4 38.4 Q42.4 38.2 43 33 Z" fill="currentColor" stroke-width="1.2"/>'
+};
+var CAT_EXTRA = {
+  sleep: '<path d="M54.5 2 h6 l-6 7 h6" stroke-width="2.2"/><path d="M63 -5.5 h4 l-4 4.6 h4" stroke-width="1.8"/>',
+  cry: '<path class="cat-tear" d="M24.5 37.1 C24 39.1 23.2 41 23.2 42.1 C23.2 43 23.8 43.6 24.5 43.6 C25.2 43.6 25.8 43 25.8 42.1 C25.8 41 25 39.1 24.5 37.1 Z" stroke-width="1.2"/>',
+  angry: ''
+};
+function catFace(kind, size) {
+  return '<svg class="cat-face" width="' + size + '" height="' + size + '" viewBox="-4 -6 72 72" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+    '<path d="M11 31 L13 10 L25 19 Q32 16.5 39 19 L51 10 L53 31 Q54 55 32 56 Q10 55 11 31 Z"/>' + CAT_EYES[kind] +
+    '<path d="M30.4 40.2 h3.2 l-1.6 1.8 Z" fill="currentColor" stroke-width="1.2"/>' +
+    '<path d="M32 42 v2.6" stroke-width="2.2"/><path d="M28 46.2 q2 -2.4 4 -1.6 q2 -0.8 4 1.6" stroke-width="2.2"/>' +
+    '<g stroke-width="1.8"><path d="M20 42.4 Q14 40.6 8.5 41.4"/><path d="M20 45.4 Q14 45.6 8.8 48.2"/><path d="M44 42.4 Q50 40.6 55.5 41.4"/><path d="M44 45.4 Q50 45.6 55.2 48.2"/></g>' +
+    CAT_EXTRA[kind] + '</svg>';
 }
 
 // ---------- уведомление ----------

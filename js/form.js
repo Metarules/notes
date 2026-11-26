@@ -13,7 +13,7 @@ function toggleSign() { setSign(-state.sign); formChanged(true); }
 function pendingBlock(cls) {
   // нет связи — о ней уже говорит плашка сверху, здесь только тихая пометка
   if (state.offline) return '<div class="' + cls + '"><span class="muted">' + esc(t("form.loadWhenOnline")) + '</span></div>';
-  if (state.loadError) return '<div class="' + cls + '"><span class="muted">' + esc(state.loadError) + '</span><button class="link inline" data-act="load">' + esc(t("retry")) + '</button></div>';
+  if (state.loadError) return '<div class="' + cls + '"><span class="cat-ill">' + catFace("cry", 64) + '</span><span class="muted">' + esc(state.loadError) + '</span><button class="link inline" data-act="load">' + esc(t("retry")) + '</button></div>';
   return '<div class="' + cls + '"><span class="spinner sm"></span></div>';
 }
 

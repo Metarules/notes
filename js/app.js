@@ -137,6 +137,7 @@ function boot() {
 window.addEventListener("hashchange", function () { location.reload(); });
 
 applyTheme();
+applyPattern();
 applyStaticI18n();
 renderLangSelect();
 setSaving(false);

@@ -12,6 +12,7 @@ var ACTIONS = {
   pickCurrency: function (a) { pickCurrency(Number(a)); },
   userPickCategory: function (a) { userPickCategory(Number(a)); },
   toggleTheme: function () { toggleTheme(); },
+  togglePattern: function () { togglePattern(); },
   openDiag: function () { openDiag(); },
   showHistPane: function (a) { showHistPane(a); },
   retryOlder: function () { retryOlder(); },
