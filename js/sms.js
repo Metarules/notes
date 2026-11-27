@@ -1,7 +1,57 @@
-// Разбор СМС и уведомлений банка: сумма, валюта, магазин.
+// Очередь СМС от шортката и разбор СМС и уведомлений банка: сумма, валюта, магазин.
 
 // ---------- разбор СМС / уведомления банка ----------
 // Разбор только здесь, на странице: сервер получает готовые сумму, валюту и магазин.
+
+// ---------- очередь СМС от шортката ----------
+// Пока телефон заблокирован, шорткат копит СМС у себя и потом передаёт все сразу: #sms=…&sms=… (старые первыми).
+// Страница держит их на телефоне ("smsQueue") и показывает по одной: сохранили трату или нажали «Пропустить» —
+// следующая. Закрыли страницу на середине — при следующем открытии продолжим с той же СМС.
+// smsDone — сколько СМС этой пачки уже разобрано: для подписи «СМС 2 из 3».
+var SMS_QUEUE_MAX = 50, SMS_TEXT_MAX = 1000;
+function smsQueue(list) {
+  if (list === undefined) {
+    try { var l = JSON.parse(store("smsQueue") || "[]"); return Array.isArray(l) ? l.filter(function (s) { return typeof s === "string" && s; }) : []; }
+    catch (e) { return []; }
+  }
+  store("smsQueue", list.length ? JSON.stringify(list.slice(0, SMS_QUEUE_MAX)) : null);
+  if (!list.length) store("smsDone", null); // пачка разобрана — следующая начнёт счёт заново
+}
+function smsDone() { var n = Number(store("smsDone")); return n > 0 ? n : 0; }
+// одинаковый текст дважды не добавляем: у банка в каждой СМС свой остаток, так что это повтор той же СМС
+function addSms(texts) {
+  var q = smsQueue();
+  texts.forEach(function (s) {
+    s = String(s || "").trim().slice(0, SMS_TEXT_MAX);
+    if (s && q.indexOf(s) < 0) q.push(s);
+  });
+  smsQueue(q);
+}
+// текущая СМС разобрана (трата сохранена или пропущена) — берём следующую
+function nextSms() {
+  var q = smsQueue();
+  if (q.length) { q.shift(); store("smsDone", q.length ? String(smsDone() + 1) : null); smsQueue(q); }
+  state.smsText = q[0] || "";
+  state.smsFailShown = false;
+  renderSmsBar();
+  if (state.smsText) applyPrefill();
+}
+function skipSms() {
+  if (state.editing) return;
+  resetForm();
+  clearUrl();
+  nextSms();
+  toast(t("sms.skipped"), false, TOAST_SHORT_MS);
+}
+// «СМС 2 из 3 · Пропустить» над формой — только когда в пачке больше одной СМС
+function renderSmsBar() {
+  var left = smsQueue().length, done = smsDone(), total = done + left;
+  var show = left > 0 && total > 1 && !state.editing;
+  var bar = el("smsBar"), wasHidden = bar.classList.contains("hidden");
+  if (show) el("smsPos").textContent = t("sms.pos", { i: done + 1, n: total });
+  bar.classList.toggle("hidden", !show);
+  if (wasHidden === show) scheduleFit(); // плашка появилась или исчезла — меняется место под кнопки
+}
 
 // число из строки: "1 234,50", "1.234,50", "1,234.50", "-350" и т.п.
 function parseNumber(raw) {

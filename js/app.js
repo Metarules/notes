@@ -1,20 +1,25 @@
 // Запуск: параметры ссылки, кэш на устройстве, подстановка траты из СМС, загрузка данных. Подключается последним.
 
 // ---------- параметры ссылки (после "#") ----------
-// sms — текст СМС от шортката (разбираем здесь, на странице); src=clip — текст взят из буфера обмена;
+// sms — текст СМС от шортката (разбираем здесь, на странице); их может быть несколько (sms=…&sms=…) —
+// тогда это очередь, см. sms.js; src=clip — текст взят из буфера обмена;
 // tab=history — сразу открыть историю; t — ключ доступа, api — адрес сервера: их запоминаем на устройстве.
 // Ключ, адрес и текст СМС сразу убираем из адресной строки.
 // Новый адрес сервера принимаем только вместе с ключом: иначе чужая ссылка «#api=…» без ключа
 // отправила бы уже сохранённый на телефоне ключ на сервер злоумышленника.
 function readParams() {
-  var q = {};
-  try { new URLSearchParams(location.hash.replace(/^#/, "")).forEach(function (v, k) { q[k] = v; }); } catch (e) {}
-  if (q.t || q.api || q.sms) {
+  var q = {}, smsList = [];
+  try {
+    var sp = new URLSearchParams(location.hash.replace(/^#/, ""));
+    sp.forEach(function (v, k) { q[k] = v; });
+    smsList = sp.getAll("sms");
+  } catch (e) {}
+  if (q.t || q.api || smsList.length) {
     var newApi = isApiUrl(q.api) && q.api !== store("api") ? q.api : "";
     if (newApi && !q.t) newApi = ""; // адрес без ключа — не меняем
     if (q.t) store("token", q.t);
     if (newApi) { store("api", newApi); store("init", null); store("stats", null); store("statsFirst", null); } // другой сервер — справочники, историю и статистику берём заново с него
-    if (q.sms) session("sms", q.sms);
+    if (smsList.length) addSms(smsList);
     var rest = new URLSearchParams();
     Object.keys(q).forEach(function (k) { if (k !== "t" && k !== "api" && k !== "sms") rest.append(k, q[k]); });
     var hash = rest.toString();
@@ -22,8 +27,10 @@ function readParams() {
     delete q.t;
     delete q.api;
   }
-  // после обновления страницы текст СМС берём из вкладки
-  if (!q.sms) q.sms = session("sms") || "";
+  // вкладка, открытая прошлой версией страницы, держала текст СМС у себя — переносим его в очередь
+  var old = session("sms");
+  if (old) { addSms([old]); session("sms", null); }
+  delete q.sms; // СМС теперь только в очереди: после обновления страницы берём их оттуда
   return q;
 }
 
@@ -68,7 +75,7 @@ function applyPrefill() {
 
 // ---------- загрузка ----------
 var params = readParams();
-state.smsText = params.sms || "";
+state.smsText = smsQueue()[0] || "";
 
 // справочники пришли (из кэша или с сервера) — обновляем, не сбивая то, что пользователь уже выбрал
 function applyData(data) {
@@ -124,6 +131,7 @@ function boot() {
   el("loader").classList.add("hidden");
   el("app").classList.remove("hidden");
   setSign(-1);
+  renderSmsBar();
   renderCurrencies(store("currency") || "");
   if (navigator.onLine === false) setOnline(false); // телефон офлайн — говорим сразу, не дожидаясь запроса
   var cached = readCache();

@@ -75,6 +75,10 @@ button:disabled .hz, html[data-haptics="off"] .hz { display:none; }
 .editbar { display:flex; align-items:center; gap:6px; margin-bottom:14px; min-height:42px; }
 .editbar .back { border:0; background:transparent; color:var(--accent); font-size:22px; padding:4px 10px 4px 2px; }
 .editbar .title { font-size:16px; font-weight:600; }
+/* очередь СМС от шортката над формой: «СМС 2 из 3» слева, «Пропустить» справа — низкая строка, чтобы на iPhone mini хватило места кнопкам */
+.smsbar { display:flex; align-items:center; justify-content:space-between; gap:10px; min-height:34px; margin-bottom:4px; padding:0 2px 0 4px; }
+.smsbar .pos { font-size:15px; font-weight:600; color:var(--text); }
+.smsbar .skip { position:relative; border:0; background:transparent; color:var(--accent); font-size:15px; padding:7px 4px 7px 10px; }
 /* шапка изменения: «Изменение» и справа дата-время операции — кнопкой-«таблеткой» (видно, что её можно нажать) */
 /* заголовок не обрезаем; если вместе с датой не помещается (узкий экран, длинное слово) — дата уходит на строку ниже, вправо */
 #editBar { flex-wrap:wrap; row-gap:4px; }

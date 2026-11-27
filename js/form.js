@@ -143,11 +143,10 @@ function resetForm() {
   formChanged();
   state.touched = false;
 }
-// убрать данные траты из адресной строки и из вкладки, чтобы обновление страницы не подставило их снова
+// убрать данные траты из адресной строки, чтобы обновление страницы не подставило их снова
+// (СМС из очереди убирает nextSms в sms.js)
 function clearUrl() {
   try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {}
-  state.smsText = "";
-  session("sms", null);
 }
 
 // крестик в поле суммы: стирает только сумму
@@ -242,6 +241,7 @@ function save() {
   clearUrl();
   setSaving(false);
   toast(offline ? t("form.savedOffline") : savedText(form), false, offline ? TOAST_LONG_MS : TOAST_SHORT_MS);
+  nextSms(); // СМС разобрана — в форму сразу следующая из очереди, если есть
   flushOutbox(true); // пробуем сразу, даже если плашка «Нет связи» ещё висит — связь могла вернуться
 }
 function clearClipboard() {
@@ -279,6 +279,7 @@ function startEdit(i) {
   el("histBar").classList.add("hidden");
   el("navRow").classList.add("hidden"); // при изменении — только «Сохранить»; назад — стрелкой в шапке
   el("editBar").classList.remove("hidden");
+  renderSmsBar(); // при изменении операции плашки очереди СМС нет
   el("view-history").classList.add("hidden");
   el("view-add").classList.remove("hidden");
   scrollToTop();
@@ -363,6 +364,7 @@ function cancelEdit() {
   state.editing = null;
   el("editBar").classList.add("hidden");
   el("navRow").classList.remove("hidden");
+  renderSmsBar();
   // возвращаем то, что было на «Вводе» до изменения
   var s = state.savedNew;
   if (s) {

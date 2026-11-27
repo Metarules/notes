@@ -4,6 +4,7 @@
 var ACTIONS = {
   load: function () { load(); },
   save: function () { save(); },
+  skipSms: function () { skipSms(); },
   showTab: function (a) { showTab(a); },
   cancelEdit: function () { cancelEdit(); },
   toggleSign: function () { toggleSign(); },
