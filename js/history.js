@@ -258,7 +258,9 @@ function renderHistory(items) {
         (r.amountEUR !== "" && r.currencyId !== "EUR" ? ' <span class="muted">' + esc(fmtNum(r.amountEUR)) + ' EUR</span>' : '') + '</div>' +
         '<div class="tx-sub">' + esc(name) + (r.time ? ' · ' + esc(r.time) : '') + '</div>' +
         (r.pending ? '<div class="tx-sub tx-status"><span class="q sending"><span class="q-spin"></span>' + esc(t("st.saving")) + '</span></div>' : '') +
-      '</div>' + (r.pending ? '' : HZ) + // касание открывает правку — с виброоткликом, как у кнопок
+      // Без невидимого переключателя (HZ) — то есть без виброотклика на касание: в iOS 27 переключатель
+      // перехватывает движение пальца, и список не прокручивался, если начать вести пальцем по операции
+      '</div>' +
       '</div></div>';
   });
   if (lastDay !== null) html += '</div>'; // закрываем карточку последнего дня
