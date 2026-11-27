@@ -75,10 +75,6 @@ button:disabled .hz, html[data-haptics="off"] .hz { display:none; }
 .editbar { display:flex; align-items:center; gap:6px; margin-bottom:14px; min-height:42px; }
 .editbar .back { border:0; background:transparent; color:var(--accent); font-size:22px; padding:4px 10px 4px 2px; }
 .editbar .title { font-size:16px; font-weight:600; }
-/* очередь операций от шортката над формой: «Операция 2 из 3» слева, «Пропустить» справа — низкая строка, чтобы на iPhone mini хватило места кнопкам */
-.opbar { display:flex; align-items:center; justify-content:space-between; gap:10px; min-height:34px; margin-bottom:4px; padding:0 2px 0 4px; }
-.opbar .pos { font-size:15px; font-weight:600; color:var(--text); }
-.opbar .skip { position:relative; border:0; background:transparent; color:var(--accent); font-size:15px; padding:7px 4px 7px 10px; }
 /* шапка изменения: «Изменение» и справа дата-время операции — кнопкой-«таблеткой» (видно, что её можно нажать) */
 /* заголовок не обрезаем; если вместе с датой не помещается (узкий экран, длинное слово) — дата уходит на строку ниже, вправо */
 #editBar { flex-wrap:wrap; row-gap:4px; }
@@ -97,6 +93,12 @@ button:disabled .hz, html[data-haptics="off"] .hz { display:none; }
 .amount-field .sign { flex:0 0 52px; border:0; border-right:1px solid var(--line); background:transparent; color:var(--text); font-size:22px; }
 .amount-field.pos .sign, .amount-field.pos input { color:var(--ok); }
 .amount-field input { flex:1; min-width:0; border:0; outline:none; background:transparent; color:var(--text); font-size:22px; padding:12px; }
+/* магазин из сообщения банка — мелкой строкой под суммой, внутри того же поля: высота поля не меняется,
+   сумма просто чуть поднимается. По ширине — от знака до крестика, длинное название обрезается многоточием */
+.amount-field { position:relative; }
+.amount-field.has-src input { padding-top:4px; padding-bottom:20px; }
+.amount-field .src { display:none; position:absolute; left:53px; right:127px; bottom:6px; padding-left:12px; font-size:12px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; pointer-events:none; }
+.amount-field.has-src .src { display:block; }
 .amount-field .clear { flex:0 0 40px; border:0; background:transparent; color:var(--muted); font-size:18px; padding:0; }
 #clearAmt.hidden { display:block !important; visibility:hidden; }
 /* валюта: свой крупный выбор вместо системного списка (его размер в iOS не настроить); select — только хранит значение */
@@ -131,6 +133,12 @@ button:disabled .hz, html[data-haptics="off"] .hz { display:none; }
 /* пока сумма и категория не введены — кнопка серая и не нажимается; во время отправки — синяя с индикатором */
 .btn:disabled { background:var(--line); color:var(--muted); cursor:default; }
 .btn.saving:disabled { background:var(--accent); color:#fff; opacity:.8; }
+/* «Пропустить» слева от «Сохранить» — в той же строке, форма не сдвигается */
+.save-row { display:flex; gap:8px; margin-top:10px; }
+.save-row .btn { margin-top:0; }
+.save-row #saveBtn { flex:1; min-width:0; }
+.btn.skip-btn { width:auto; flex:0 0 auto; padding:13px 14px; background:transparent; color:var(--accent); box-shadow:inset 0 0 0 1px var(--line); }
+.btn .op-pos { opacity:.85; }
 .link { display:block; width:100%; margin-top:6px; padding:8px; border:0; background:transparent; color:var(--muted); font-size:14px; }
 /* вместо style="…" в разметке (их запрещает защита страницы): кнопка-ссылка по ширине текста, текст по центру */
 .link.auto { width:auto; }

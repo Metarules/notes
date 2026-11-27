@@ -41,7 +41,7 @@ function nextOp() {
   if (q.length) { q.shift(); store("opDone", q.length ? String(opDone() + 1) : null); opQueue(q); }
   state.opText = q[0] || "";
   state.opFailShown = false;
-  renderOpBar();
+  renderOpUi();
   if (state.opText) applyPrefill();
 }
 function skipOp() {
@@ -51,14 +51,19 @@ function skipOp() {
   nextOp();
   toast(t("op.skipped"), false, TOAST_SHORT_MS);
 }
-// «Операция 2 из 3 · Пропустить» над формой — только когда в пачке больше одной операции
-function renderOpBar() {
+// Что видно об очереди и об источнике операции — без отдельной строки над формой, чтобы форма не сдвигалась:
+// магазин — мелко под суммой; при нескольких операциях — «Пропустить» рядом с «Сохранить · 1 из 3».
+function opPosText() {
+  if (state.editing) return "";
   var left = opQueue().length, done = opDone(), total = done + left;
-  var show = left > 0 && total > 1 && !state.editing;
-  var bar = el("opBar"), wasHidden = bar.classList.contains("hidden");
-  if (show) el("opPos").textContent = t("op.pos", { i: done + 1, n: total });
-  bar.classList.toggle("hidden", !show);
-  if (wasHidden === show) scheduleFit(); // плашка появилась или исчезла — меняется место под кнопки
+  return left > 0 && total > 1 ? t("op.pos", { i: done + 1, n: total }) : "";
+}
+function renderOpUi() {
+  var m = !state.editing && state.prefill && state.prefill.merchant || "";
+  el("opSource").textContent = m;
+  el("amountField").classList.toggle("has-src", !!m);
+  el("skipBtn").classList.toggle("hidden", !opPosText());
+  if (!saving) setSaving(false); // перерисовать подпись «Сохранить»
 }
 
 // ---------- разбор СМС / уведомления банка ----------

@@ -71,6 +71,7 @@ function applyPrefill() {
   fillForm(p);
   // src=clip — шорткат взял текст из буфера обмена: после сохранения буфер очистим
   state.prefill = { merchant: p.merchant || "", fromClip: q.src === "clip" };
+  renderOpUi();
 }
 
 // ---------- загрузка ----------
@@ -131,7 +132,7 @@ function boot() {
   el("loader").classList.add("hidden");
   el("app").classList.remove("hidden");
   setSign(-1);
-  renderOpBar();
+  renderOpUi();
   renderCurrencies(store("currency") || "");
   if (navigator.onLine === false) setOnline(false); // телефон офлайн — говорим сразу, не дожидаясь запроса
   var cached = readCache();

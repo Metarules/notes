@@ -54,8 +54,8 @@ var I18N = {
   "form.savedOffline": { ru: "Нет связи — сохранено на телефоне, отправится позже", en: "No connection — saved on the phone, will be sent later", de: "Keine Verbindung — auf dem Telefon gespeichert, wird später gesendet", sr: "Nema veze — sačuvano na telefonu, biće poslato kasnije", es: "Sin conexión — guardado en el teléfono, se enviará más tarde" },
   "form.pasteNoAmount": { ru: "В тексте нет суммы с валютой — введите вручную", en: "No amount with a currency in the text — enter it manually", de: "Kein Betrag mit Währung im Text — bitte manuell eingeben", sr: "U tekstu nema iznosa sa valutom — unesite ručno", es: "No hay un importe con moneda en el texto — introdúcelo a mano" },
   "form.smsFail": { ru: "Не получилось разобрать сообщение банка — введите сумму вручную", en: "Couldn't read the bank message — enter the amount manually", de: "Bankmitteilung nicht erkannt — Betrag bitte manuell eingeben", sr: "Poruka banke nije prepoznata — unesite iznos ručno", es: "No se pudo leer el mensaje del banco — introduce el importe a mano" },
-  // очередь операций от шортката: плашка над формой
-  "op.pos": { ru: "Операция {i} из {n}", en: "Transaction {i} of {n}", de: "Buchung {i} von {n}", sr: "Transakcija {i} od {n}", es: "Movimiento {i} de {n}" },
+  // очередь операций от шортката: номер на «Сохранить» («Сохранить · 1 из 3») и кнопка «Пропустить»
+  "op.pos": { ru: "{i} из {n}", en: "{i} of {n}", de: "{i} von {n}", sr: "{i} od {n}", es: "{i} de {n}" },
   "op.skip": { ru: "Пропустить", en: "Skip", de: "Überspringen", sr: "Preskoči", es: "Omitir" },
   "op.skipped": { ru: "Операция пропущена", en: "Transaction skipped", de: "Buchung übersprungen", sr: "Transakcija preskočena", es: "Movimiento omitido" },
   "form.loadWhenOnline": { ru: "Загрузится, когда будет связь", en: "Will load when you're online", de: "Wird geladen, sobald eine Verbindung besteht", sr: "Učitaće se kada bude veze", es: "Se cargará cuando haya conexión" },

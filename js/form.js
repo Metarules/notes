@@ -142,6 +142,7 @@ function resetForm() {
   state.wantCurrency = "";
   formChanged();
   state.touched = false;
+  renderOpUi();
 }
 // убрать данные траты из адресной строки, чтобы обновление страницы не подставило их снова
 // (операцию из очереди убирает nextOp в sms.js)
@@ -170,6 +171,7 @@ el("amount").addEventListener("paste", function (e) {
   if (!r) { toast(state.loaded ? t("form.pasteNoAmount") : t("form.dictLoading"), false, TOAST_LONG_MS); return; }
   fillForm({ amount: r.amount, currencyId: r.currencyId, categoryId: merchantCategory(r.merchant) });
   state.prefill = { merchant: r.merchant || "", fromClip: true }; // вставили из буфера — после сохранения очистим его
+  renderOpUi();
   state.touched = true;
 });
 
@@ -279,7 +281,7 @@ function startEdit(i) {
   el("histBar").classList.add("hidden");
   el("navRow").classList.add("hidden"); // при изменении — только «Сохранить»; назад — стрелкой в шапке
   el("editBar").classList.remove("hidden");
-  renderOpBar(); // при изменении операции плашки очереди нет
+  renderOpUi(); // при изменении операции ни магазина, ни «Пропустить», ни номера в очереди
   el("view-history").classList.add("hidden");
   el("view-add").classList.remove("hidden");
   scrollToTop();
@@ -364,7 +366,6 @@ function cancelEdit() {
   state.editing = null;
   el("editBar").classList.add("hidden");
   el("navRow").classList.remove("hidden");
-  renderOpBar();
   // возвращаем то, что было на «Вводе» до изменения
   var s = state.savedNew;
   if (s) {
@@ -373,5 +374,6 @@ function cancelEdit() {
     state.touched = s.touched;
     state.savedNew = null;
   } else resetForm();
+  renderOpUi();
   showTab("history");
 }
