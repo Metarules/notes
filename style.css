@@ -235,7 +235,8 @@ button:disabled .hz, html[data-haptics="off"] .hz { display:none; }
 .net-badge:disabled { opacity:.6; }
 .net-badge #netCount:empty { display:none; }
 /* траты из очереди на телефоне — в истории сверху, приглушённо */
-.row.queued .tx { opacity:.75; }
+/* приглушаем содержимое, а не саму карточку: полупрозрачная карточка при свайпе просвечивала кнопкой «Удалить» под собой */
+.row.queued .tx-main { opacity:.75; }
 .row.queued .tx-sub .q { color:var(--warn); }
 .row.queued .tx-sub .q.err { color:var(--danger); }
 .row.queued .tx-sub .q.sending { color:var(--accent); }
