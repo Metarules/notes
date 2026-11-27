@@ -32,7 +32,9 @@ function rangeLabel(kind, r) {
 }
 function fmtEur(x) {
   x = Number(x) || 0;
-  return x.toLocaleString(locale(), { minimumFractionDigits: 0, maximumFractionDigits: Math.abs(x) >= 100 ? 0 : 2 }) + " €";
+  // чем больше сумма, тем меньше знаков после запятой: от 100 — целые, от 10 — десятые, меньше 10 — сотые
+  var ax = Math.abs(x), digits = ax >= 100 ? 0 : ax >= 10 ? 1 : 2;
+  return x.toLocaleString(locale(), { minimumFractionDigits: 0, maximumFractionDigits: digits }) + " €";
 }
 function showHistPane(p) {
   stats.pane = p;
