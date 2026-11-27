@@ -49,7 +49,7 @@ function fitLayout() {
   var reserve = fitReserve();
   function slack() { return window.innerHeight - reserve - (anchor.getBoundingClientRect().bottom + scrolledBy()); } // минус — не помещается
   var s = slack();
-  var sig = [chips.length, window.innerWidth, el("netBar").classList.contains("hidden"), el("smsBar").classList.contains("hidden"), anchor.id].join("|");
+  var sig = [chips.length, window.innerWidth, el("netBar").classList.contains("hidden"), el("opBar").classList.contains("hidden"), anchor.id].join("|");
   var force = fitForce; fitForce = false;
   if (fitDone && sig === fitSig && !force) {
     if (!fitSettling()) return;                    // после «устаканивания» — только при реальных переменах

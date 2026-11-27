@@ -54,10 +54,10 @@ var I18N = {
   "form.savedOffline": { ru: "Нет связи — сохранено на телефоне, отправится позже", en: "No connection — saved on the phone, will be sent later", de: "Keine Verbindung — auf dem Telefon gespeichert, wird später gesendet", sr: "Nema veze — sačuvano na telefonu, biće poslato kasnije", es: "Sin conexión — guardado en el teléfono, se enviará más tarde" },
   "form.pasteNoAmount": { ru: "В тексте нет суммы с валютой — введите вручную", en: "No amount with a currency in the text — enter it manually", de: "Kein Betrag mit Währung im Text — bitte manuell eingeben", sr: "U tekstu nema iznosa sa valutom — unesite ručno", es: "No hay un importe con moneda en el texto — introdúcelo a mano" },
   "form.smsFail": { ru: "Не получилось разобрать сообщение банка — введите сумму вручную", en: "Couldn't read the bank message — enter the amount manually", de: "Bankmitteilung nicht erkannt — Betrag bitte manuell eingeben", sr: "Poruka banke nije prepoznata — unesite iznos ručno", es: "No se pudo leer el mensaje del banco — introduce el importe a mano" },
-  // очередь СМС от шортката: плашка над формой
-  "sms.pos": { ru: "СМС {i} из {n}", en: "SMS {i} of {n}", de: "SMS {i} von {n}", sr: "SMS {i} od {n}", es: "SMS {i} de {n}" },
-  "sms.skip": { ru: "Пропустить", en: "Skip", de: "Überspringen", sr: "Preskoči", es: "Omitir" },
-  "sms.skipped": { ru: "СМС пропущена", en: "SMS skipped", de: "SMS übersprungen", sr: "SMS preskočen", es: "SMS omitido" },
+  // очередь операций от шортката: плашка над формой
+  "op.pos": { ru: "Операция {i} из {n}", en: "Transaction {i} of {n}", de: "Buchung {i} von {n}", sr: "Transakcija {i} od {n}", es: "Movimiento {i} de {n}" },
+  "op.skip": { ru: "Пропустить", en: "Skip", de: "Überspringen", sr: "Preskoči", es: "Omitir" },
+  "op.skipped": { ru: "Операция пропущена", en: "Transaction skipped", de: "Buchung übersprungen", sr: "Transakcija preskočena", es: "Movimiento omitido" },
   "form.loadWhenOnline": { ru: "Загрузится, когда будет связь", en: "Will load when you're online", de: "Wird geladen, sobald eine Verbindung besteht", sr: "Učitaće se kada bude veze", es: "Se cargará cuando haya conexión" },
   "form.dictLoading": { ru: "Справочники ещё загружаются — попробуйте через пару секунд", en: "Lists are still loading — try again in a few seconds", de: "Listen werden noch geladen — in ein paar Sekunden erneut versuchen", sr: "Liste se još učitavaju — pokušajte za par sekundi", es: "Las listas aún se están cargando — inténtalo en unos segundos" },
   "form.noNetEdit": { ru: "Нет связи — изменить можно, когда появится связь", en: "No connection — you can edit once you're back online", de: "Keine Verbindung — Bearbeiten ist möglich, sobald eine Verbindung besteht", sr: "Nema veze — izmena je moguća kada se veza vrati", es: "Sin conexión — podrás editar cuando vuelva la conexión" },

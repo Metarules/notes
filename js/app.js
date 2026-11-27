@@ -1,36 +1,36 @@
-// Запуск: параметры ссылки, кэш на устройстве, подстановка траты из СМС, загрузка данных. Подключается последним.
+// Запуск: параметры ссылки, кэш на устройстве, подстановка траты из очереди операций, загрузка данных. Подключается последним.
 
 // ---------- параметры ссылки (после "#") ----------
-// sms — текст СМС от шортката (разбираем здесь, на странице); их может быть несколько (sms=…&sms=…) —
-// тогда это очередь, см. sms.js; src=clip — текст взят из буфера обмена;
+// op — операция от шортката: текст сообщения банка (разбираем здесь, на странице); их может быть несколько
+// (op=…&op=…) — это очередь, см. sms.js; прежнее имя параметра sms тоже принимаем; src=clip — текст взят из буфера обмена;
 // tab=history — сразу открыть историю; t — ключ доступа, api — адрес сервера: их запоминаем на устройстве.
-// Ключ, адрес и текст СМС сразу убираем из адресной строки.
+// Ключ, адрес и тексты операций сразу убираем из адресной строки.
 // Новый адрес сервера принимаем только вместе с ключом: иначе чужая ссылка «#api=…» без ключа
 // отправила бы уже сохранённый на телефоне ключ на сервер злоумышленника.
 function readParams() {
-  var q = {}, smsList = [];
+  var q = {}, opList = [];
   try {
     var sp = new URLSearchParams(location.hash.replace(/^#/, ""));
     sp.forEach(function (v, k) { q[k] = v; });
-    smsList = sp.getAll("sms");
+    opList = sp.getAll("op").concat(sp.getAll("sms"));
   } catch (e) {}
-  if (q.t || q.api || smsList.length) {
+  if (q.t || q.api || opList.length) {
     var newApi = isApiUrl(q.api) && q.api !== store("api") ? q.api : "";
     if (newApi && !q.t) newApi = ""; // адрес без ключа — не меняем
     if (q.t) store("token", q.t);
     if (newApi) { store("api", newApi); store("init", null); store("stats", null); store("statsFirst", null); } // другой сервер — справочники, историю и статистику берём заново с него
-    if (smsList.length) addSms(q.src === "clip" ? smsList.filter(clipLooksLikeBank) : smsList);
+    if (opList.length) addOps(q.src === "clip" ? opList.filter(clipLooksLikeBank) : opList);
     var rest = new URLSearchParams();
-    Object.keys(q).forEach(function (k) { if (k !== "t" && k !== "api" && k !== "sms") rest.append(k, q[k]); });
+    Object.keys(q).forEach(function (k) { if (k !== "t" && k !== "api" && k !== "op" && k !== "sms") rest.append(k, q[k]); });
     var hash = rest.toString();
     try { history.replaceState(null, "", location.pathname + location.search + (hash ? "#" + hash : "")); } catch (e) {}
     delete q.t;
     delete q.api;
   }
-  // вкладка, открытая прошлой версией страницы, держала текст СМС у себя — переносим его в очередь
+  // вкладка, открытая страницей до 81-й, держала текст СМС у себя — переносим его в очередь
   var old = session("sms");
-  if (old) { addSms([old]); session("sms", null); }
-  delete q.sms; // СМС теперь только в очереди: после обновления страницы берём их оттуда
+  if (old) { addOps([old]); session("sms", null); }
+  delete q.op; delete q.sms; // операции теперь только в очереди: после обновления страницы берём их оттуда
   return q;
 }
 
@@ -46,19 +46,19 @@ function cacheInit(part) {
   try { store("init", JSON.stringify(Object.assign(c || {}, part))); } catch (e) {}
 }
 
-// ---------- подстановка траты из ссылки или СМС ----------
+// ---------- подстановка траты из очереди операций ----------
 // Вызывается сразу при открытии и ещё раз, когда пришли справочники: до этого могут быть
 // неизвестны валюты (общий формат СМС) и категории магазинов. Ввод пользователя не перезаписываем.
 function applyPrefill() {
   if (state.editing) return;
   var q = params, p = null;
-  if (state.smsText) {
-    var r = parseBankText(state.smsText);
+  if (state.opText) {
+    var r = parseBankText(state.opText);
     if (r) p = { amount: r.amount, currencyId: r.currencyId, categoryId: merchantCategory(r.merchant), merchant: r.merchant };
-    else if (state.loaded && !state.smsFailShown && looksLikeBankText(state.smsText)) {
+    else if (state.loaded && !state.opFailShown && looksLikeBankText(state.opText)) {
       // подсказываем, только если это явно сообщение банка (например, банк поменял формат);
       // любой другой текст из буфера молча оставляет форму пустой
-      state.smsFailShown = true;
+      state.opFailShown = true;
       toast(t("form.smsFail"), false, TOAST_LONG_MS);
     }
   }
@@ -75,7 +75,7 @@ function applyPrefill() {
 
 // ---------- загрузка ----------
 var params = readParams();
-state.smsText = smsQueue()[0] || "";
+state.opText = opQueue()[0] || "";
 
 // справочники пришли (из кэша или с сервера) — обновляем, не сбивая то, что пользователь уже выбрал
 function applyData(data) {
@@ -131,7 +131,7 @@ function boot() {
   el("loader").classList.add("hidden");
   el("app").classList.remove("hidden");
   setSign(-1);
-  renderSmsBar();
+  renderOpBar();
   renderCurrencies(store("currency") || "");
   if (navigator.onLine === false) setOnline(false); // телефон офлайн — говорим сразу, не дожидаясь запроса
   var cached = readCache();

@@ -1,64 +1,68 @@
-// Очередь СМС от шортката и разбор СМС и уведомлений банка: сумма, валюта, магазин.
+// Очередь операций от шортката и разбор СМС и уведомлений банка: сумма, валюта, магазин.
 
-// ---------- разбор СМС / уведомления банка ----------
-// Разбор только здесь, на странице: сервер получает готовые сумму, валюту и магазин.
-
-// ---------- очередь СМС от шортката ----------
-// Пока телефон заблокирован, шорткат копит СМС у себя и потом передаёт все сразу: #sms=…&sms=… (старые первыми).
-// Страница держит их на телефоне ("smsQueue") и показывает по одной: сохранили трату или нажали «Пропустить» —
-// следующая. Закрыли страницу на середине — при следующем открытии продолжим с той же СМС.
-// smsDone — сколько СМС этой пачки уже разобрано: для подписи «СМС 2 из 3».
-var SMS_QUEUE_MAX = 50, SMS_TEXT_MAX = 1000;
-function smsQueue(list) {
+// ---------- очередь операций от шортката ----------
+// Каждая операция — текст сообщения банка. Пока телефон заблокирован, шорткат копит их у себя и потом передаёт
+// все сразу: #op=…&op=… (старые первыми; прежнее имя параметра sms= тоже принимаем).
+// Страница держит их на телефоне ("opQueue") и показывает по одной: сохранили трату или нажали «Пропустить» —
+// следующая. Закрыли страницу на середине — при следующем открытии продолжим с той же операции.
+// opDone — сколько операций этой пачки уже разобрано: для подписи «Операция 2 из 3».
+var OP_QUEUE_MAX = 50, OP_TEXT_MAX = 1000;
+function opQueue(list) {
   if (list === undefined) {
-    try { var l = JSON.parse(store("smsQueue") || "[]"); return Array.isArray(l) ? l.filter(function (s) { return typeof s === "string" && s; }) : []; }
+    // очередь, оставшаяся от страниц 81–82, хранилась под прежними именами — переносим
+    if (store("smsQueue") && !store("opQueue")) { store("opQueue", store("smsQueue")); store("opDone", store("smsDone")); }
+    store("smsQueue", null); store("smsDone", null);
+    try { var l = JSON.parse(store("opQueue") || "[]"); return Array.isArray(l) ? l.filter(function (s) { return typeof s === "string" && s; }) : []; }
     catch (e) { return []; }
   }
-  store("smsQueue", list.length ? JSON.stringify(list.slice(0, SMS_QUEUE_MAX)) : null);
-  if (!list.length) store("smsDone", null); // пачка разобрана — следующая начнёт счёт заново
+  store("opQueue", list.length ? JSON.stringify(list.slice(0, OP_QUEUE_MAX)) : null);
+  if (!list.length) store("opDone", null); // пачка разобрана — следующая начнёт счёт заново
 }
-function smsDone() { var n = Number(store("smsDone")); return n > 0 ? n : 0; }
-// одинаковый текст дважды не добавляем: у банка в каждой СМС свой остаток, так что это повтор той же СМС
-function addSms(texts) {
-  var q = smsQueue();
+function opDone() { var n = Number(store("opDone")); return n > 0 ? n : 0; }
+// одинаковый текст дважды не добавляем: у банка в каждом сообщении свой остаток, так что это повтор того же сообщения
+function addOps(texts) {
+  var q = opQueue();
   texts.forEach(function (s) {
-    s = String(s || "").trim().slice(0, SMS_TEXT_MAX);
+    s = String(s || "").trim().slice(0, OP_TEXT_MAX);
     if (s && q.indexOf(s) < 0) q.push(s);
   });
-  smsQueue(q);
+  opQueue(q);
 }
-// Текст из буфера обмена (src=clip) берём в очередь, только если он похож на сообщение банка: слова из СМС банка
+// Текст из буфера обмена (src=clip) берём в очередь, только если он похож на сообщение банка: слова из сообщений банка
 // или сумма с кодом валюты («RSD 500», «12.00 EUR»). Иначе чужой текст из буфера (пароль, адрес…) надолго
 // остался бы в очереди на телефоне. Раньше такой текст всё равно не заполнял форму — для неё ничего не меняется.
 function clipLooksLikeBank(s) {
   s = String(s || "");
   return looksLikeBankText(s) || /\d\s?[A-Z]{3}\b|\b[A-Z]{3}\s?\d/.test(s);
 }
-// текущая СМС разобрана (трата сохранена или пропущена) — берём следующую
-function nextSms() {
-  var q = smsQueue();
-  if (q.length) { q.shift(); store("smsDone", q.length ? String(smsDone() + 1) : null); smsQueue(q); }
-  state.smsText = q[0] || "";
-  state.smsFailShown = false;
-  renderSmsBar();
-  if (state.smsText) applyPrefill();
+// текущая операция разобрана (трата сохранена или пропущена) — берём следующую
+function nextOp() {
+  var q = opQueue();
+  if (q.length) { q.shift(); store("opDone", q.length ? String(opDone() + 1) : null); opQueue(q); }
+  state.opText = q[0] || "";
+  state.opFailShown = false;
+  renderOpBar();
+  if (state.opText) applyPrefill();
 }
-function skipSms() {
+function skipOp() {
   if (state.editing) return;
   resetForm();
   clearUrl();
-  nextSms();
-  toast(t("sms.skipped"), false, TOAST_SHORT_MS);
+  nextOp();
+  toast(t("op.skipped"), false, TOAST_SHORT_MS);
 }
-// «СМС 2 из 3 · Пропустить» над формой — только когда в пачке больше одной СМС
-function renderSmsBar() {
-  var left = smsQueue().length, done = smsDone(), total = done + left;
+// «Операция 2 из 3 · Пропустить» над формой — только когда в пачке больше одной операции
+function renderOpBar() {
+  var left = opQueue().length, done = opDone(), total = done + left;
   var show = left > 0 && total > 1 && !state.editing;
-  var bar = el("smsBar"), wasHidden = bar.classList.contains("hidden");
-  if (show) el("smsPos").textContent = t("sms.pos", { i: done + 1, n: total });
+  var bar = el("opBar"), wasHidden = bar.classList.contains("hidden");
+  if (show) el("opPos").textContent = t("op.pos", { i: done + 1, n: total });
   bar.classList.toggle("hidden", !show);
   if (wasHidden === show) scheduleFit(); // плашка появилась или исчезла — меняется место под кнопки
 }
+
+// ---------- разбор СМС / уведомления банка ----------
+// Разбор только здесь, на странице: сервер получает готовые сумму, валюту и магазин.
 
 // число из строки: "1 234,50", "1.234,50", "1,234.50", "-350" и т.п.
 function parseNumber(raw) {
