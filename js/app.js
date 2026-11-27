@@ -109,17 +109,17 @@ function applyLimits(l) {
 
 function load() {
   if (!state.loaded) { state.loadError = ""; renderCategories(); renderHistory(null); }
-  el("netRetry").disabled = true;
+  el("netBadge").disabled = true;
   call("apiGetInitData", [], function (data) {
-    el("netRetry").disabled = false;
+    el("netBadge").disabled = false;
     cacheInit({ categories: data.categories, currencies: data.currencies, merchants: data.merchants || {}, recent: data.recent, todayKey: data.todayKey, periodStartDay: data.periodStartDay, limits: data.limits, serverVersion: data.serverVersion });
     applyData(data);
     flushOutbox(); // связь есть — отправляем траты, отложенные без связи
     flushCancels(); // и удаляем на сервере то, что удалили, пока оно отправлялось
     preloadStatsAll(); // и статистику — фоном, чтобы она открылась сразу
   }, function (msg) {
-    el("netRetry").disabled = false;
-    if (state.loaded) return; // данные из кэша уже на экране; если нет связи — об этом говорит плашка
+    el("netBadge").disabled = false;
+    if (state.loaded) return; // данные из кэша уже на экране; если нет связи — об этом говорит значок внизу
     state.loadError = msg;
     renderCategories();
     renderHistory(null);

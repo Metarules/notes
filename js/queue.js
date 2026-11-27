@@ -1,6 +1,6 @@
-// Плашка «Нет связи» и очередь трат на телефоне: отправка пачками, отмена удалением.
+// Значок «Нет связи» и очередь трат на телефоне: отправка пачками, отмена удалением.
 
-// ---------- связь с сервером: плашка «Нет связи» ----------
+// ---------- связь с сервером: значок «Нет связи» в нижней строке ----------
 function setOnline(on) {
   var changed = state.offline === !!on;
   state.offline = !on;
@@ -8,12 +8,18 @@ function setOnline(on) {
   if (changed && !state.loaded) { renderCategories(); renderHistory(null); }
   if (changed && on) setTimeout(flushOutbox, 0); // связь вернулась — отправляем отложенное
 }
+function pendingCount() { return outbox().filter(function (x) { return !x.error; }).length; }
 function updateNetBar() {
-  var n = outbox().filter(function (x) { return !x.error; }).length;
-  el("netText").textContent = n ? tn("net.pending", n) : t("net.savedOnPhone");
-  var wasHidden = el("netBar").classList.contains("hidden");
-  el("netBar").classList.toggle("hidden", !state.offline);
-  if (wasHidden === state.offline) scheduleFit(); // плашка появилась или исчезла — меняется место под кнопки
+  var n = pendingCount(), b = el("netBadge");
+  el("netCount").textContent = n ? String(n) : "";
+  b.setAttribute("aria-label", t("net.title") + (n ? ". " + tn("net.pending", n) : ""));
+  b.classList.toggle("hidden", !state.offline);
+}
+// нажали на значок: пробуем связаться снова и коротко поясняем, что происходит
+function netRetry() {
+  var n = pendingCount();
+  toast(t("net.title") + ". " + (n ? tn("net.pending", n) : t("net.savedOnPhone")), false, TOAST_LONG_MS);
+  load();
 }
 
 // ---------- очередь трат на телефоне ----------
@@ -128,6 +134,6 @@ function flushOutbox(now) {
     else if (!noAnswer(kind)) toast(t("q.sendFailed", { msg: msg }), true);
   }, { keepalive: true });
 }
-// телефон снова в сети — сразу пробуем загрузить; пропала сеть — сразу показываем плашку
+// телефон снова в сети — сразу пробуем загрузить; пропала сеть — сразу показываем значок «Нет связи»
 window.addEventListener("online", function () { load(); });
 window.addEventListener("offline", function () { setOnline(false); });

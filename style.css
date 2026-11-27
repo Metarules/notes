@@ -31,12 +31,11 @@ html, .scroller { background-color:var(--bg); background-image:url(img/cats-ligh
 html[data-theme="dark"], html[data-theme="dark"] .scroller { background-image:url(img/cats-dark.svg?v=57); }
 /* котики выключены в «Настройках» — нет ни узора, ни мордочек на ошибках */
 html[data-cats="off"], html[data-cats="off"] .scroller { background-image:none; }
-html[data-cats="off"] .cat-ill, html[data-cats="off"] .nb-cat { display:none !important; }
+html[data-cats="off"] .cat-ill { display:none !important; }
 /* котик на ошибках (catFace в core.js): линии — приглушённые, слеза — цвет кнопок */
 .cat-ill { display:flex; justify-content:center; color:var(--illus); }
 .cat-ill:empty { display:none; }
 .cat-tear { fill:var(--accent); stroke:var(--accent); }
-.nb-cat { flex:0 0 auto; display:flex; margin-left:-4px; }
 .loader.denied #loaderText { font-size:15px; line-height:1.4; max-width:280px; }
 /* переключатель в «Настройках» */
 /* Невидимый системный переключатель внутри кнопки — ради «тика» iOS при касании (core.js, HZ) */
@@ -230,14 +229,11 @@ button:disabled .hz, html[data-haptics="off"] .hz { display:none; }
 .toast.err { background:var(--danger); color:#fff; }
 /* пока данные грузятся фоном — индикаторы на месте категорий, валюты и истории */
 .spinner.sm { width:22px; height:22px; border-width:2px; }
-/* нет связи с сервером — плашка над формой, держится, пока связь не вернётся */
-.netbar { display:flex; align-items:center; gap:12px; margin-bottom:12px; padding:10px 12px 10px 14px; border-radius:12px; background:var(--warn-bg); color:var(--warn); }
-.netbar .nb-text { flex:1; min-width:0; line-height:1.3; }
-.netbar .nb-title { display:block; font-size:15px; font-weight:600; }
-.netbar .nb-sub { display:block; font-size:13px; opacity:.85; margin-top:1px; }
-/* кнопка — отдельный «пилюлей» с рамкой, чтобы не читалась как продолжение текста */
-.netbar button { flex:0 0 auto; display:flex; align-items:center; justify-content:center; width:40px; height:40px; border:1.5px solid currentColor; border-radius:50%; background:transparent; color:inherit; padding:0; }
-.netbar button:disabled { opacity:.5; }
+/* «Нет связи» — значок в нижней строке рядом с темой: облако перечёркнуто + сколько операций ждут отправки */
+.net-badge { flex:0 0 auto; display:flex; align-items:center; gap:4px; height:30px; padding:0 9px; margin-right:6px; border:0; border-radius:15px; background:var(--warn-bg); color:var(--warn); font-size:14px; font-weight:600; position:relative; }
+.net-badge svg { width:18px; height:18px; }
+.net-badge:disabled { opacity:.6; }
+.net-badge #netCount:empty { display:none; }
 /* траты из очереди на телефоне — в истории сверху, приглушённо */
 .row.queued .tx { opacity:.75; }
 .row.queued .tx-sub .q { color:var(--warn); }

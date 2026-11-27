@@ -20,7 +20,7 @@ var FIT_RESERVE = 80, FIT_NORMAL_MIN = 52, FIT_COMPACT_MIN = 38, FIT_MAX = 76;
 var fitQueued = false, fitDone = false, lastSize = { w: 0, h: 0 };
 // Первые секунды окно шортката ещё «устаканивается»: высота страницы меняется, пока выезжает лист с формой.
 // В это время подгоняем по каждому изменению — к моменту, когда вы начинаете вводить, всё уже на месте.
-// Потом подгонка только при реальных переменах (другое число категорий, поворот, плашка «Нет связи»,
+// Потом подгонка только при реальных переменах (другое число категорий, поворот,
 // изменение операции) — приход свежих данных с сервера сам по себе ничего не двигает.
 var FIT_SETTLE_MS = 2500, fitT0 = Date.now(), fitSig = "", fitForce = false;
 function fitSettling() { return Date.now() - fitT0 < FIT_SETTLE_MS; }
@@ -49,7 +49,7 @@ function fitLayout() {
   var reserve = fitReserve();
   function slack() { return window.innerHeight - reserve - (anchor.getBoundingClientRect().bottom + scrolledBy()); } // минус — не помещается
   var s = slack();
-  var sig = [chips.length, window.innerWidth, el("netBar").classList.contains("hidden"), anchor.id].join("|");
+  var sig = [chips.length, window.innerWidth, anchor.id].join("|");
   var force = fitForce; fitForce = false;
   if (fitDone && sig === fitSig && !force) {
     if (!fitSettling()) return;                    // после «устаканивания» — только при реальных переменах

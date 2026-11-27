@@ -11,7 +11,7 @@ function toggleSign() { setSign(-state.sign); formChanged(true); }
 // ---------- индикаторы загрузки ----------
 // пока справочников нет: в сетке категорий — индикатор или ошибка с кнопкой «Повторить»
 function pendingBlock(cls) {
-  // нет связи — о ней уже говорит плашка сверху, здесь только тихая пометка
+  // нет связи — о ней уже говорит значок в нижней строке, здесь только тихая пометка
   if (state.offline) return '<div class="' + cls + '"><span class="muted">' + esc(t("form.loadWhenOnline")) + '</span></div>';
   if (state.loadError) return '<div class="' + cls + '"><span class="cat-ill">' + catFace("cry", 64) + '</span><span class="muted">' + esc(state.loadError) + '</span><button class="link inline" data-act="load">' + esc(t("retry")) + '</button></div>';
   return '<div class="' + cls + '"><span class="spinner sm"></span></div>';
@@ -244,7 +244,7 @@ function save() {
   setSaving(false);
   toast(offline ? t("form.savedOffline") : savedText(form), false, offline ? TOAST_LONG_MS : TOAST_SHORT_MS);
   nextOp(); // операция разобрана — в форму сразу следующая из очереди, если есть
-  flushOutbox(true); // пробуем сразу, даже если плашка «Нет связи» ещё висит — связь могла вернуться
+  flushOutbox(true); // пробуем сразу, даже если значок «Нет связи» ещё виден — связь могла вернуться
 }
 function clearClipboard() {
   function fallback() {
