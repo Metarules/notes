@@ -19,7 +19,7 @@ function readParams() {
     if (newApi && !q.t) newApi = ""; // адрес без ключа — не меняем
     if (q.t) store("token", q.t);
     if (newApi) { store("api", newApi); store("init", null); store("stats", null); store("statsFirst", null); } // другой сервер — справочники, историю и статистику берём заново с него
-    if (smsList.length) addSms(smsList);
+    if (smsList.length) addSms(q.src === "clip" ? smsList.filter(clipLooksLikeBank) : smsList);
     var rest = new URLSearchParams();
     Object.keys(q).forEach(function (k) { if (k !== "t" && k !== "api" && k !== "sms") rest.append(k, q[k]); });
     var hash = rest.toString();
