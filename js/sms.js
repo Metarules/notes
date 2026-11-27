@@ -3,9 +3,9 @@
 // ---------- очередь операций от шортката ----------
 // Каждая операция — текст сообщения банка. Пока телефон заблокирован, шорткат копит их у себя и потом передаёт
 // все сразу: #op=…&op=… (старые первыми; прежнее имя параметра sms= тоже принимаем).
-// Страница держит их на телефоне ("opQueue") и показывает по одной: сохранили трату или нажали «Пропустить» —
-// следующая. Закрыли страницу на середине — при следующем открытии продолжим с той же операции.
-// opDone — сколько операций этой пачки уже разобрано: для подписи «Операция 2 из 3».
+// Страница держит их на телефоне ("opQueue"), пока каждую не сохранят или не пропустят; разбирают их по нажатию
+// на значок очереди (см. toggleOps ниже). Закрыли страницу на середине — операции дождутся в очереди.
+// opDone — сколько операций этой пачки уже разобрано: для подписи «Сохранить · 2 из 3».
 var OP_QUEUE_MAX = 50, OP_TEXT_MAX = 1000;
 function opQueue(list) {
   if (list === undefined) {
@@ -35,26 +35,51 @@ function clipLooksLikeBank(s) {
   s = String(s || "");
   return looksLikeBankText(s) || /\d\s?[A-Z]{3}\b|\b[A-Z]{3}\s?\d/.test(s);
 }
-// текущая операция разобрана (трата сохранена или пропущена) — берём следующую
+// Разбор очереди — второстепенный: форма всегда открывается пустой, чтобы новую трату можно было ввести сразу,
+// а очередь видна значком в нижней строке (opBadge). Нажали значок — разбор (state.opMode): форма заполняется
+// операциями из очереди по одной. Нажали ещё раз — снова пустая форма, а операции остаются в очереди.
+function toggleOps() {
+  if (state.editing) return;
+  if (state.opMode) stopOps();
+  else if (opQueue().length) startOps();
+}
+function startOps() {
+  state.opMode = true;
+  resetForm(); // то, что успели набрать вручную, заменяется первой операцией из очереди
+  clearUrl();
+  state.opText = opQueue()[0] || "";
+  state.opFailShown = false;
+  renderOpUi();
+  applyPrefill();
+}
+function stopOps() {
+  state.opMode = false;
+  state.opText = "";
+  resetForm();
+}
+// после сохранения: если разбираем очередь — текущая операция разобрана, берём следующую.
+// Трата, введённая вручную, очередь не трогает
 function nextOp() {
+  if (!state.opMode) { renderOpUi(); return; }
   var q = opQueue();
   if (q.length) { q.shift(); store("opDone", q.length ? String(opDone() + 1) : null); opQueue(q); }
-  state.opText = q[0] || "";
+  if (!q.length) state.opMode = false; // очередь разобрана — дальше обычная пустая форма
+  state.opText = state.opMode ? q[0] : "";
   state.opFailShown = false;
   renderOpUi();
   if (state.opText) applyPrefill();
 }
 function skipOp() {
-  if (state.editing) return;
+  if (state.editing || !state.opMode) return;
   resetForm();
   clearUrl();
   nextOp();
   toast(t("op.skipped"), false, TOAST_SHORT_MS);
 }
 // Что видно об очереди и об источнике операции — без отдельной строки над формой, чтобы форма не сдвигалась:
-// магазин — мелко под суммой; при нескольких операциях — «Пропустить» рядом с «Сохранить · 1 из 3».
+// магазин — мелко под суммой; во время разбора — «Пропустить» рядом с «Сохранить · 1 из 3»; число в очереди — на значке.
 function opPosText() {
-  if (state.editing) return "";
+  if (state.editing || !state.opMode) return "";
   var left = opQueue().length, done = opDone(), total = done + left;
   return left > 0 && total > 1 ? t("op.pos", { i: done + 1, n: total }) : "";
 }
@@ -62,7 +87,13 @@ function renderOpUi() {
   var m = !state.editing && state.prefill && state.prefill.merchant || "";
   el("opSource").textContent = m;
   el("amountField").classList.toggle("has-src", !!m);
-  el("skipBtn").classList.toggle("hidden", !opPosText());
+  el("skipBtn").classList.toggle("hidden", !state.opMode || !!state.editing);
+  var n = opQueue().length, badge = el("opBadge");
+  el("opCount").textContent = n ? String(n) : "";
+  badge.classList.toggle("hidden", !n && !state.opMode);
+  badge.classList.toggle("on", state.opMode);
+  badge.setAttribute("aria-pressed", state.opMode ? "true" : "false");
+  badge.setAttribute("aria-label", state.opMode ? t("op.badgeStop") : t("op.badge", { n: n }));
   if (!saving) setSaving(false); // перерисовать подпись «Сохранить»
 }
 

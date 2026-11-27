@@ -61,6 +61,11 @@ button:disabled .hz, html[data-haptics="off"] .hz { display:none; }
 /* строка под формой: слева переход в историю, справа тумблер темы и шестерёнка (настройки) */
 .navrow { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:40px; padding:0 2px; }
 .nav-right { display:flex; align-items:center; gap:2px; }
+.nav-left { display:flex; align-items:center; gap:4px; min-width:0; }
+/* очередь операций от шортката: синий значок с числом; во время разбора — залитый (нажать ещё раз — выйти) */
+.op-badge { flex:0 0 auto; display:flex; align-items:center; gap:4px; height:30px; padding:0 9px; border:0; border-radius:15px; background:color-mix(in srgb, var(--accent) 15%, transparent); color:var(--accent); font-size:14px; font-weight:600; position:relative; }
+.op-badge svg { width:18px; height:18px; }
+.op-badge.on { background:var(--accent); color:#fff; }
 .icon-btn { flex:0 0 auto; display:flex; align-items:center; justify-content:center; width:40px; height:40px; border:0; padding:0; background:transparent; color:var(--muted); }
 .icon-btn svg { width:22px; height:22px; }
 .hist-link { display:inline-flex; align-items:center; gap:5px; border:0; background:transparent; color:var(--muted); font-size:16px; padding:9px 8px 9px 4px; }

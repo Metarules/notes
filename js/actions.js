@@ -5,6 +5,7 @@ var ACTIONS = {
   load: function () { load(); },
   save: function () { save(); },
   skipOp: function () { skipOp(); },
+  toggleOps: function () { toggleOps(); },
   netRetry: function () { netRetry(); },
   showTab: function (a) { showTab(a); },
   cancelEdit: function () { cancelEdit(); },

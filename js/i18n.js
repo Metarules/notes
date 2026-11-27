@@ -56,6 +56,8 @@ var I18N = {
   "form.smsFail": { ru: "Не получилось разобрать сообщение банка — введите сумму вручную", en: "Couldn't read the bank message — enter the amount manually", de: "Bankmitteilung nicht erkannt — Betrag bitte manuell eingeben", sr: "Poruka banke nije prepoznata — unesite iznos ručno", es: "No se pudo leer el mensaje del banco — introduce el importe a mano" },
   // очередь операций от шортката: номер на «Сохранить» («Сохранить · 1 из 3») и кнопка «Пропустить»
   "op.pos": { ru: "{i} из {n}", en: "{i} of {n}", de: "{i} von {n}", sr: "{i} od {n}", es: "{i} de {n}" },
+  "op.badge": { ru: "Операции из сообщений банка: {n}. Нажмите, чтобы разобрать", en: "Bank messages to process: {n}. Tap to go through them", de: "Bankmitteilungen zu bearbeiten: {n}. Tippen zum Durchgehen", sr: "Poruke banke za obradu: {n}. Dodirnite da ih prođete", es: "Mensajes del banco por procesar: {n}. Toca para revisarlos" },
+  "op.badgeStop": { ru: "Выйти из разбора операций — к пустой форме", en: "Stop going through bank messages — back to an empty form", de: "Durchgehen beenden — zurück zum leeren Formular", sr: "Prekini obradu — nazad na prazan obrazac", es: "Dejar de revisar — volver al formulario vacío" },
   "op.skip": { ru: "Пропустить", en: "Skip", de: "Überspringen", sr: "Preskoči", es: "Omitir" },
   "op.skipped": { ru: "Операция пропущена", en: "Transaction skipped", de: "Buchung übersprungen", sr: "Transakcija preskočena", es: "Movimiento omitido" },
   "form.loadWhenOnline": { ru: "Загрузится, когда будет связь", en: "Will load when you're online", de: "Wird geladen, sobald eine Verbindung besteht", sr: "Učitaće se kada bude veze", es: "Se cargará cuando haya conexión" },
