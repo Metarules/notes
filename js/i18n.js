@@ -41,6 +41,7 @@ var I18N = {
   "hist.title": { ru: "История", en: "History", de: "Verlauf", sr: "Istorija", es: "Historial" },
   "settings.title": { ru: "Настройки", en: "Settings", de: "Einstellungen", sr: "Podešavanja", es: "Ajustes" },
   "edit.title": { ru: "Изменение", en: "Edit", de: "Bearbeiten", sr: "Izmena", es: "Editar" },
+  "edit.deleteAgain": { ru: "Нажмите «Удалить» ещё раз", en: "Tap “Delete” again", de: "Noch einmal auf „Löschen“ tippen", sr: "Dodirnite „Obriši“ ponovo", es: "Toca «Eliminar» otra vez" },
   "edit.whenAria": { ru: "Дата и время операции", en: "Transaction date and time", de: "Datum und Uhrzeit der Buchung", sr: "Datum i vreme transakcije", es: "Fecha y hora del movimiento" },
 
   "form.signAria": { ru: "Сменить знак", en: "Change sign", de: "Vorzeichen ändern", sr: "Promeni znak", es: "Cambiar signo" },
@@ -120,7 +121,7 @@ var I18N = {
   "stats.staleOffline": { ru: "Нет связи — показаны сохранённые данные", en: "No connection — showing saved data", de: "Keine Verbindung — gespeicherte Daten", sr: "Nema veze — prikazani su sačuvani podaci", es: "Sin conexión — se muestran los datos guardados" },
   "stats.loadFailed": { ru: "Не загрузилось: {msg}", en: "Didn't load: {msg}", de: "Nicht geladen: {msg}", sr: "Nije učitano: {msg}", es: "No se cargó: {msg}" },
   "stats.spent": { ru: "Траты", en: "Spending", de: "Ausgaben", sr: "Troškovi", es: "Gastos" },
-  "stats.income": { ru: "Начисления", en: "Income", de: "Einnahmen", sr: "Prihodi", es: "Ingresos" },
+  "stats.income": { ru: "Доходы", en: "Income", de: "Einnahmen", sr: "Prihodi", es: "Ingresos" },
   "stats.balance": { ru: "Баланс", en: "Balance", de: "Saldo", sr: "Saldo", es: "Saldo" },
   "stats.noOps": { ru: "Операций за этот промежуток нет", en: "No transactions in this period", de: "Keine Buchungen in diesem Zeitraum", sr: "Nema transakcija u ovom periodu", es: "No hay movimientos en este periodo" },
   "stats.spentByCat": { ru: "Траты по категориям", en: "Spending by category", de: "Ausgaben nach Kategorie", sr: "Troškovi po kategorijama", es: "Gastos por categoría" },
@@ -133,7 +134,6 @@ var I18N = {
   "set.about": { ru: "О форме", en: "About", de: "Info", sr: "O aplikaciji", es: "Información" },
   "set.pageVer": { ru: "Версия страницы", en: "Page version", de: "Seitenversion", sr: "Verzija stranice", es: "Versión de la página" },
   "set.serverVer": { ru: "Версия сервера", en: "Server version", de: "Serverversion", sr: "Verzija servera", es: "Versión del servidor" },
-  "set.diag": { ru: "Диагностика экрана", en: "Screen diagnostics", de: "Bildschirmdiagnose", sr: "Dijagnostika ekrana", es: "Diagnóstico de pantalla" },
 
   "diag.versions": { ru: "Версии: страница {p}, сервер {s}", en: "Versions: page {p}, server {s}", de: "Versionen: Seite {p}, Server {s}", sr: "Verzije: stranica {p}, server {s}", es: "Versiones: página {p}, servidor {s}" },
   "diag.sizes": { ru: "Размеры окна (для настройки формы)", en: "Window sizes (for tuning the form)", de: "Fenstergrößen (zur Anpassung des Formulars)", sr: "Veličine prozora (za podešavanje forme)", es: "Tamaños de ventana (para ajustar el formulario)" },
@@ -206,7 +206,14 @@ function fmtDayMonthLong(d, withYear) { return fmtParts(d, withYear ? { day: "nu
 // «Ноябрь 2026» / «November 2026»
 function fmtMonthYear(d) { return cap1(fmtParts(d, { month: "long", year: "numeric" })); }
 function fmtWeekday(d) { return cap1(fmtParts(d, { weekday: "long" })); }
-function fmtNum(n) { return isFinite(n) ? Number(n).toLocaleString(locale(), { maximumFractionDigits: 2 }) : String(n); }
+// суммы операций: целые — без копеек, дробные — всегда с двумя знаками («−12,50», а не «−12,5»);
+// минус — типографский «−», как на кнопке знака и в балансе Статистики
+function fmtNum(n) {
+  if (!isFinite(n)) return String(n);
+  n = Number(n);
+  var cents = Math.round(Math.abs(n) * 100) % 100 !== 0;
+  return n.toLocaleString(locale(), { minimumFractionDigits: cents ? 2 : 0, maximumFractionDigits: 2 }).replace(/^-/, "−");
+}
 
 // ---------- статичный текст страницы: data-i18n — текст, data-i18n-aria — подпись для экранного диктора ----------
 function applyStaticI18n() {

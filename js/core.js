@@ -6,7 +6,7 @@
 // Номер релиза страницы = число коммитов index.html на GitHub, включая тот, где он записан
 // (git rev-list --count HEAD -- index.html): +1 при каждом изменении страницы. Виден внизу формы
 // рядом с номером сервера — так понятно, что телефон открыл свежую страницу, а не старую из кэша.
-var PAGE_VERSION = 93;
+var PAGE_VERSION = 94;
 
 var state = { categories: [], currencies: [], merchants: {}, recent: [], prefill: null, editing: null, savedNew: null, sign: -1, categoryId: "", todayKey: "",
   loaded: false, loadError: "", offline: false, touched: false, opText: "", opFailShown: false, opMode: false };
@@ -66,15 +66,18 @@ function haptic(n) {
 
 // ---------- котик на ошибках ----------
 // Одна мордочка-смайлик (голова с ушками, носик, рот «ω», усы); различаются только глаза и мелочи:
-// sleep — нет связи (спит, «z»), cry — сервер не ответил (плачет, синяя слеза), angry — нет доступа (сердитый прищур).
+// sleep — нет связи (спит, «z»), cry — сервер не ответил (плачет, синяя слеза), angry — ключ не подошёл (сердитый прищур),
+// calm — страницу открыли не через шорткат (ошибки нет — спокойные глаза-точки).
 // Цвет линий — currentColor (задаёт место, где мордочка стоит), слеза — цвет кнопок (.cat-tear в стилях).
 var CAT_EYES = {
+  calm: '<circle cx="24.5" cy="35" r="2.4" fill="currentColor" stroke="none"/><circle cx="39.5" cy="35" r="2.4" fill="currentColor" stroke="none"/>',
   sleep: '<path d="M21 35 q3.5 2.6 7 0"/><path d="M36 35 q3.5 2.6 7 0"/>',
   cry: '<path d="M21 35.6 q3.5 -2.6 7 0"/><path d="M36 35.6 q3.5 -2.6 7 0"/>',
   angry: '<path d="M21 33 L28 35.8 Q27.4 38.4 24.6 38.4 Q21.6 38.2 21 33 Z" fill="currentColor" stroke-width="1.2"/>' +
     '<path d="M43 33 L36 35.8 Q36.6 38.4 39.4 38.4 Q42.4 38.2 43 33 Z" fill="currentColor" stroke-width="1.2"/>'
 };
 var CAT_EXTRA = {
+  calm: '',
   sleep: '<path d="M54.5 2 h6 l-6 7 h6" stroke-width="2.2"/><path d="M63 -5.5 h4 l-4 4.6 h4" stroke-width="1.8"/>',
   cry: '<path class="cat-tear" d="M24.5 37.1 C24 39.1 23.2 41 23.2 42.1 C23.2 43 23.8 43.6 24.5 43.6 C25.2 43.6 25.8 43 25.8 42.1 C25.8 41 25 39.1 24.5 37.1 Z" stroke-width="1.2"/>',
   angry: ''

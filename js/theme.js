@@ -26,12 +26,22 @@ if (darkQuery) {
   else if (darkQuery.addListener) darkQuery.addListener(onSystemTheme);
 }
 
-// Диагностика размеров окна (для подгонки кнопок под экран) — пункт на экране «Настройки».
+// Диагностика размеров окна (для подгонки кнопок под экран) — долгое нажатие на строку «Версия страницы»
+// в «Настройках»: отдельный пункт мешал бы обычному пользованию.
 // Меряет форму ввода, поэтому сначала возвращаемся на неё и показываем данные поверх.
 function openDiag() {
   showTab("add");
   requestAnimationFrame(function () { requestAnimationFrame(showDiag); });
 }
+var DIAG_HOLD_MS = 700;
+(function () {
+  var row = el("verRow"), timer = null;
+  if (!row) return;
+  function stop() { clearTimeout(timer); timer = null; }
+  row.addEventListener("pointerdown", function () { stop(); timer = setTimeout(function () { timer = null; haptic(1); openDiag(); }, DIAG_HOLD_MS); });
+  ["pointerup", "pointercancel", "pointerleave"].forEach(function (ev) { row.addEventListener(ev, stop); });
+  row.addEventListener("contextmenu", function (e) { e.preventDefault(); }); // без системного меню долгого нажатия
+})();
 function showDiag() {
   function probe(css) {
     var d = document.createElement("div");

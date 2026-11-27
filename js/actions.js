@@ -9,6 +9,7 @@ var ACTIONS = {
   netRetry: function () { netRetry(); },
   showTab: function (a) { showTab(a); },
   cancelEdit: function () { cancelEdit(); },
+  deleteEdited: function () { deleteEdited(); },
   toggleSign: function () { toggleSign(); },
   clearAmount: function () { clearAmount(); },
   toggleCurPanel: function () { toggleCurPanel(); },

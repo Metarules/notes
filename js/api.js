@@ -30,7 +30,7 @@ function call(fn, args, onOk, onErr, opts) {
     setSaving(false);
   }
   var api = store("api"), token = store("token");
-  if (!isApiUrl(api) || !token) { noAccess(t("err.openViaShortcut")); return; }
+  if (!isApiUrl(api) || !token) { noAccess(t("err.openViaShortcut"), "calm"); return; }
   var body = API[fn].apply(null, args || []);
   body.action = "page";
   body.token = token;
@@ -90,12 +90,13 @@ function renderVersion() {
 }
 
 
-function noAccess(text) {
+// face — мордочка котика: "angry" (по умолчанию) — ключ не подошёл, "calm" — просто открыли не через шорткат
+function noAccess(text, face) {
   el("app").classList.add("hidden");
   el("loader").classList.remove("hidden");
-  el("loader").classList.add("denied"); // карточка с сердитым котиком
+  el("loader").classList.add("denied"); // карточка с котиком вместо формы
   el("spinner").classList.add("hidden");
   el("retryBtn").classList.add("hidden");
-  el("loaderCat").innerHTML = catFace("angry", 64);
+  el("loaderCat").innerHTML = catFace(face || "angry", 64);
   el("loaderText").textContent = text;
 }

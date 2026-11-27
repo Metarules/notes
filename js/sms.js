@@ -88,6 +88,8 @@ function renderOpUi() {
   el("opSource").textContent = m;
   el("amountField").classList.toggle("has-src", !!m);
   el("skipBtn").classList.toggle("hidden", !state.opMode || !!state.editing);
+  el("delBtn").classList.toggle("hidden", !state.editing); // «Удалить» — только на экране «Изменение» (form.js)
+  if (!state.editing) disarmDelete();
   var n = opQueue().length, badge = el("opBadge");
   el("opCount").textContent = n ? String(n) : "";
   badge.classList.toggle("hidden", !n && !state.opMode);

@@ -128,7 +128,7 @@ function load() {
 
 // форма показывается сразу; чего ещё нет — крутится индикатор, пока данные грузятся фоном
 function boot() {
-  if (!hasAccess()) { noAccess(t("err.openViaShortcut")); return; }
+  if (!hasAccess()) { noAccess(t("err.openViaShortcut"), "calm"); return; }
   el("loader").classList.add("hidden");
   el("app").classList.remove("hidden");
   setSign(-1);

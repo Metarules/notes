@@ -362,6 +362,33 @@ function undoEditLocally(old) {
   if (canRedrawHistory()) renderHistory(list); else state.recent = list;
 }
 
+// «Удалить» на экране «Изменение»: первое нажатие делает кнопку красной и подсказывает нажать ещё раз,
+// второе (пока кнопка красная) — удаляет так же, как свайп в истории. Ширина кнопки не меняется — форма не сдвигается.
+var DEL_ARM_MS = 4000;
+function deleteEdited() {
+  var e = state.editing, b = el("delBtn");
+  if (!e) return;
+  if (!b.classList.contains("armed")) {
+    b.classList.add("armed");
+    toast(t("edit.deleteAgain"), false, DEL_ARM_MS);
+    clearTimeout(deleteEdited.timer);
+    deleteEdited.timer = setTimeout(disarmDelete, DEL_ARM_MS);
+    return;
+  }
+  disarmDelete();
+  if (navigator.onLine === false) { toast(t("form.noNetDelete"), "net", TOAST_LONG_MS); return; } // остаёмся на изменении
+  var i = -1;
+  state.recent.some(function (x, k) { if (e.expected.id ? x.id === e.expected.id : x.row === e.row) { i = k; return true; } return false; });
+  cancelEdit(); // назад в историю, а там операция пропадёт, как при свайпе
+  if (i < 0) { toast(t("err.server"), true); return; }
+  deleteRow(i);
+}
+function disarmDelete() {
+  clearTimeout(deleteEdited.timer);
+  var b = el("delBtn");
+  if (b) b.classList.remove("armed");
+}
+
 function cancelEdit() {
   state.editing = null;
   el("editBar").classList.add("hidden");

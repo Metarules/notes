@@ -24,7 +24,7 @@ var fitQueued = false, fitDone = false, lastSize = { w: 0, h: 0 };
 // изменение операции) — приход свежих данных с сервера сам по себе ничего не двигает.
 var FIT_SETTLE_MS = 2500, fitT0 = Date.now(), fitSig = "", fitForce = false;
 function fitSettling() { return Date.now() - fitT0 < FIT_SETTLE_MS; }
-// журнал размеров окна для диагностики (долгое нажатие на переключатель темы)
+// журнал размеров окна для диагностики (долгое нажатие на «Версию страницы» в «Настройках»)
 var FIT_LOG_MAX = 30; // строк в журнале
 var fitLog = [];
 function fitNote(what) {
