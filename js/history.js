@@ -32,7 +32,8 @@ list.addEventListener("pointermove", function (e) {
   var dx = e.clientX - swipe.startX, dy = e.clientY - swipe.startY;
   if (!swipe.active) {
     if (Math.abs(dx) < SWIPE_START_PX && Math.abs(dy) < SWIPE_START_PX) return;
-    if (Math.abs(dy) >= Math.abs(dx)) { swipe.row = null; return; } // вертикально — это прокрутка
+    // вертикально — это прокрутка, а не касание: отпускание пальца не должно открыть операцию на правку
+    if (Math.abs(dy) >= Math.abs(dx)) { swipe.row = null; swipe.moved = true; return; }
     swipe.active = true; swipe.moved = true;
     if (swipe.openRow && swipe.openRow !== swipe.row) closeOpenRow();
     try { swipe.row.setPointerCapture(e.pointerId); } catch (x) {}
