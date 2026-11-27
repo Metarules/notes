@@ -87,7 +87,7 @@ function setStatsSync(mode) {
   b.className = "stats-sync" + (mode === "sync" ? " on" : "");
   if (mode === "sync") b.innerHTML = '<span class="q-spin"></span>' + esc(t("stats.syncing"));
   else if (mode === "stale") b.innerHTML = esc(t("stats.stale")) + ' <button class="link inline" data-act="loadStats">' + esc(t("retry")) + '</button>';
-  else if (mode === "staleOffline") b.textContent = t("stats.staleOffline");
+  else if (mode === "staleOffline") { b.textContent = t("stats.staleOffline"); b.className += " net-text"; }
   else b.textContent = "";
 }
 function statsKey(r) { return dkey(r.from) + "|" + dkey(r.to); }
@@ -152,7 +152,7 @@ function loadStats(fresh) {
   if (cached) renderStats(cached); else el("statsBody").innerHTML = '<div class="pending tall"><span class="spinner sm"></span></div>';
   if (navigator.onLine === false || state.offline) {
     setStatsSync(cached ? "staleOffline" : "");
-    if (!cached) el("statsBody").innerHTML = '<div class="pending tall"><span class="muted">' + esc(t("stats.waitNet")) + '</span></div>';
+    if (!cached) el("statsBody").innerHTML = '<div class="pending tall"><span class="net-text">' + esc(t("stats.waitNet")) + '</span></div>';
     return;
   }
   if (k === "c") {
@@ -179,7 +179,7 @@ function loadOneStats(key, r, cached, seq) {
     if (seq !== stats.seq) return;
     if (cached) { setStatsSync(kind === "network" ? "staleOffline" : "stale"); return; }
     setStatsSync("");
-    el("statsBody").innerHTML = '<div class="pending tall"><span class="muted">' + esc(kind === "network" ? t("stats.waitNet") : t("stats.loadFailed", { msg: msg })) +
+    el("statsBody").innerHTML = '<div class="pending tall"><span class="' + (kind === "network" ? "net-text" : "muted") + '">' + esc(kind === "network" ? t("stats.waitNet") : t("stats.loadFailed", { msg: msg })) +
       '</span><button class="link inline" data-act="loadStats">' + esc(t("retry")) + '</button></div>';
   });
 }

@@ -62,7 +62,7 @@ list.addEventListener("click", function (e) {
   if (qid) { // трата из очереди: свайп «Удалить» убирает её с телефона, касание ничего не делает
     if (e.target.closest(".swipe-del")) { haptic(1); Snd.tap(); dropQueued(qid); }
     else if (swipe.openRow) closeOpenRow();
-    else toast(t(sendingIds.indexOf(qid) > -1 ? "q.sending" : state.offline ? "q.waitNet" : "q.queued"));
+    else toast(t(sendingIds.indexOf(qid) > -1 ? "q.sending" : state.offline ? "q.waitNet" : "q.queued"), state.offline && sendingIds.indexOf(qid) < 0 ? "net" : false);
     return;
   }
   var i = Number(row.getAttribute("data-i"));
@@ -154,7 +154,7 @@ function renderMore() {
   if (hist.loading) m.innerHTML = '<span class="spinner sm"></span>';
   else if (hist.failed) m.innerHTML = '<span class="muted">' + esc(t("hist.olderFailed")) + '</span><button class="link inline" data-act="retryOlder">' + esc(t("retry")) + '</button>';
   else if (hist.done) m.innerHTML = '<span class="muted">' + esc(t("hist.allLoaded")) + '</span>';
-  else if (state.offline || navigator.onLine === false) m.innerHTML = '<span class="muted">' + esc(t("hist.olderWaitNet")) + '</span>';
+  else if (state.offline || navigator.onLine === false) m.innerHTML = '<span class="net-text">' + esc(t("hist.olderWaitNet")) + '</span>';
   else m.innerHTML = "";
 }
 // до конца списка осталось меньше HIST_PRELOAD_SCREENS экранов — грузим следующую страницу
@@ -168,7 +168,7 @@ function canRedrawHistory() { return !state.editing && !swipe.openRow && !swipe.
 function deleteRow(i) {
   var r = state.recent[i];
   if (!r) return;
-  if (navigator.onLine === false) { closeOpenRow(); toast(t("form.noNetDelete"), false, TOAST_LONG_MS); return; }
+  if (navigator.onLine === false) { closeOpenRow(); toast(t("form.noNetDelete"), "net", TOAST_LONG_MS); return; }
   pendingDeletes++;
   // строки ниже удаляемой в таблице сдвинутся вверх на одну
   var rest = state.recent.filter(function (x, k) { return k !== i; }).map(function (x) {
@@ -192,7 +192,7 @@ function deleteRow(i) {
     allDone(full);
   }, function (msg, kind) {
     pendingDeletes--;
-    if (kind === "network") toast(t("form.noNetDelete"), false, TOAST_LONG_MS);
+    if (kind === "network") toast(t("form.noNetDelete"), "net", TOAST_LONG_MS);
     else if (kind === "timeout") toast(t("hist.deleteUnknown"), false, TOAST_LONG_MS); // могла и удалиться — перечитаем
     else toast(msg, true);
     if (kind !== "network") deleteFailed = true; // после всех ответов перечитаем историю; без связи — всё равно не выйдет

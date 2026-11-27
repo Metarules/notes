@@ -6,7 +6,7 @@
 // Номер релиза страницы = число коммитов index.html на GitHub, включая тот, где он записан
 // (git rev-list --count HEAD -- index.html): +1 при каждом изменении страницы. Виден внизу формы
 // рядом с номером сервера — так понятно, что телефон открыл свежую страницу, а не старую из кэша.
-var PAGE_VERSION = 90;
+var PAGE_VERSION = 91;
 
 var state = { categories: [], currencies: [], merchants: {}, recent: [], prefill: null, editing: null, savedNew: null, sign: -1, categoryId: "", todayKey: "",
   loaded: false, loadError: "", offline: false, touched: false, opText: "", opFailShown: false };
@@ -92,12 +92,13 @@ function catFace(kind, size) {
 // isError — красное уведомление (ошибка); ms — сколько показывать, если нужно дольше обычного
 // сколько держится уведомление: обычное, «Сохранено», подсказка или предупреждение, ошибка
 var TOAST_MS = 2500, TOAST_SHORT_MS = 2000, TOAST_LONG_MS = 4000, TOAST_ERROR_MS = 5000;
-function toast(text, isError, ms) {
-  var t = el("toast");
+// kind: true — ошибка (красное), "net" — нет связи (жёлтое, как значок «Нет связи»), иначе — обычное
+function toast(text, kind, ms) {
+  var t = el("toast"), cls = kind === true ? " err" : kind === "net" ? " net" : "";
   t.textContent = text;
-  t.className = "toast show" + (isError ? " err" : "");
+  t.className = "toast show" + cls;
   clearTimeout(toast.timer);
-  toast.timer = setTimeout(function () { t.className = "toast" + (isError ? " err" : ""); }, ms || (isError ? TOAST_ERROR_MS : TOAST_MS));
+  toast.timer = setTimeout(function () { t.className = "toast" + cls; }, ms || (kind === true ? TOAST_ERROR_MS : TOAST_MS));
 }
 
 // любое касание страницы или нажатие клавиши убирает уведомление: пользователь уже приступил к делу.

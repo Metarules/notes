@@ -18,7 +18,7 @@ function updateNetBar() {
 // нажали на значок: пробуем связаться снова и коротко поясняем, что происходит
 function netRetry() {
   var n = pendingCount();
-  toast(t("net.title") + ". " + (n ? tn("net.pending", n) : t("net.savedOnPhone")), false, TOAST_LONG_MS);
+  toast(t("net.title") + ". " + (n ? tn("net.pending", n) : t("net.savedOnPhone")), "net", TOAST_LONG_MS);
   load();
 }
 
