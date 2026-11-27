@@ -38,9 +38,11 @@ html[data-cats="off"] .cat-ill { display:none !important; }
 .cat-tear { fill:var(--accent); stroke:var(--accent); }
 .loader.denied #loaderText { font-size:15px; line-height:1.4; max-width:280px; }
 /* переключатель в «Настройках» */
-/* Невидимый системный переключатель внутри кнопки — ради «тика» iOS при касании (core.js, HZ) */
+/* Невидимый системный переключатель внутри кнопки — ради «тика» iOS при касании (core.js, HZ).
+   Прозрачность ровно 0: при .02 «стеклянный» переключатель iOS 27 проступал светлым пятном слева в кнопке;
+   проверено на iPhone с iOS 27 — с 0 пятна нет, а тик остаётся */
 .btn, .chip { position:relative; }
-.hz { position:absolute; inset:0; width:100%; height:100%; margin:0; padding:0; opacity:.02; border-radius:inherit; outline:none; -webkit-tap-highlight-color:transparent; }
+.hz { position:absolute; inset:0; width:100%; height:100%; margin:0; padding:0; opacity:0; border-radius:inherit; outline:none; -webkit-tap-highlight-color:transparent; }
 button:disabled .hz, html[data-haptics="off"] .hz { display:none; }
 .sw { position:relative; flex:0 0 auto; width:48px; height:28px; border:0; border-radius:999px; padding:0; background:var(--line); transition:background .2s; }
 .sw[aria-checked="true"] { background:var(--accent); }
