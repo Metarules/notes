@@ -5,20 +5,17 @@
 // все сразу: #op=…&op=… (старые первыми; прежнее имя параметра sms= тоже принимаем).
 // Страница держит их на телефоне ("opQueue"), пока каждую не сохранят или не пропустят; разбирают их по нажатию
 // на значок очереди (см. toggleOps ниже). Закрыли страницу на середине — операции дождутся в очереди.
-// opDone — сколько операций этой пачки уже разобрано: для подписи «Сохранить · 2 из 3».
 var OP_QUEUE_MAX = 50, OP_TEXT_MAX = 1000;
 function opQueue(list) {
   if (list === undefined) {
     // очередь, оставшаяся от страниц 81–82, хранилась под прежними именами — переносим
-    if (store("smsQueue") && !store("opQueue")) { store("opQueue", store("smsQueue")); store("opDone", store("smsDone")); }
-    store("smsQueue", null); store("smsDone", null);
+    if (store("smsQueue") && !store("opQueue")) store("opQueue", store("smsQueue"));
+    store("smsQueue", null); store("smsDone", null); store("opDone", null); // счётчик «2 из 3» до страницы 103 — больше не нужен
     try { var l = JSON.parse(store("opQueue") || "[]"); return Array.isArray(l) ? l.filter(function (s) { return typeof s === "string" && s; }) : []; }
     catch (e) { return []; }
   }
   store("opQueue", list.length ? JSON.stringify(list.slice(0, OP_QUEUE_MAX)) : null);
-  if (!list.length) store("opDone", null); // пачка разобрана — следующая начнёт счёт заново
 }
-function opDone() { var n = Number(store("opDone")); return n > 0 ? n : 0; }
 // одинаковый текст дважды не добавляем: у банка в каждом сообщении свой остаток, так что это повтор того же сообщения
 function addOps(texts) {
   var q = opQueue();
@@ -62,7 +59,7 @@ function stopOps() {
 function nextOp() {
   if (!state.opMode) { renderOpUi(); return; }
   var q = opQueue();
-  if (q.length) { q.shift(); store("opDone", q.length ? String(opDone() + 1) : null); opQueue(q); }
+  if (q.length) { q.shift(); opQueue(q); }
   if (!q.length) state.opMode = false; // очередь разобрана — дальше обычная пустая форма
   state.opText = state.opMode ? q[0] : "";
   state.opFailShown = false;
@@ -77,12 +74,8 @@ function skipOp() {
   toast(t("op.skipped"), false, TOAST_SHORT_MS);
 }
 // Что видно об очереди и об источнике операции — без отдельной строки над формой, чтобы форма не сдвигалась:
-// магазин — мелко под суммой; во время разбора — «Пропустить» рядом с «Сохранить · 1 из 3»; число в очереди — на значке.
-function opPosText() {
-  if (state.editing || !state.opMode) return "";
-  var left = opQueue().length, done = opDone(), total = done + left;
-  return left > 0 && total > 1 ? t("op.pos", { i: done + 1, n: total }) : "";
-}
+// магазин — мелко под суммой; во время разбора — «Пропустить» рядом с «Сохранить»; сколько осталось — число на значке
+// (уменьшилось — цифра въезжает снизу, значок слегка подпрыгивает: видно, что шаг сделан).
 function renderOpUi() {
   var m = !state.editing && state.prefill && state.prefill.merchant || "";
   el("opSource").textContent = m;
@@ -90,8 +83,13 @@ function renderOpUi() {
   el("skipBtn").classList.toggle("hidden", !state.opMode || !!state.editing);
   el("delBtn").classList.toggle("hidden", !state.editing); // «Удалить» — только на экране «Изменение» (form.js)
   if (!state.editing) disarmDelete();
-  var n = opQueue().length, badge = el("opBadge");
-  el("opCount").textContent = n ? String(n) : "";
+  var n = opQueue().length, badge = el("opBadge"), cnt = el("opCount"), was = Number(cnt.textContent) || 0;
+  cnt.textContent = n ? String(n) : "";
+  if (n && n < was) { // перезапуск анимации: снять класс, дать браузеру перерисовать, поставить снова
+    badge.classList.remove("tick");
+    void badge.offsetWidth;
+    badge.classList.add("tick");
+  }
   badge.classList.toggle("hidden", !n && !state.opMode);
   badge.classList.toggle("on", state.opMode);
   badge.setAttribute("aria-pressed", state.opMode ? "true" : "false");

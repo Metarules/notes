@@ -69,6 +69,13 @@ button:disabled .hz, html[data-haptics="off"] .hz { display:none; }
 /* очередь операций от шортката: синий значок-стопка с числом; во время разбора — «вдавленный», как нажатая клавиша (нажать ещё раз — отжать и выйти) */
 .op-badge { flex:0 0 auto; display:flex; align-items:center; gap:4px; height:30px; padding:0 9px; margin-right:6px; border:0; border-radius:15px; background:color-mix(in srgb, var(--accent) 15%, transparent); color:var(--accent); font-size:14px; font-weight:600; position:relative; }
 .op-badge svg { width:18px; height:18px; }
+/* число уменьшилось (операция сохранена или пропущена): цифра въезжает снизу, значок слегка подпрыгивает */
+.op-badge #opCount { display:inline-block; }
+.op-badge.tick { animation:op-bump .32s ease-out; }
+.op-badge.tick #opCount { animation:op-roll .32s ease-out; }
+@keyframes op-bump { 0% { transform:scale(1); } 35% { transform:scale(1.12); } 100% { transform:scale(1); } }
+@keyframes op-roll { 0% { transform:translateY(45%); opacity:0; } 60% { opacity:1; } 100% { transform:translateY(0); opacity:1; } }
+@media (prefers-reduced-motion: reduce) { .op-badge.tick, .op-badge.tick #opCount { animation:none; } }
 .op-badge.on { background:color-mix(in srgb, var(--accent) 28%, var(--bg)); color:var(--accent); box-shadow:inset 0 2px 4px rgba(0,0,0,.28), inset 0 0 0 1.5px var(--accent); }
 .icon-btn { flex:0 0 auto; display:flex; align-items:center; justify-content:center; width:44px; height:44px; border:0; padding:0; background:transparent; color:var(--muted); }
 .icon-btn svg { width:22px; height:22px; }
@@ -149,10 +156,6 @@ button:disabled .hz, html[data-haptics="off"] .hz { display:none; }
 /* «Пропустить» / «Удалить» — такой же ширины, как «Сохранить»: кнопки делят строку поровну */
 .save-row .btn { flex:1 1 0; min-width:0; line-height:20px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-left:8px; padding-right:8px; }
 .btn.skip-btn { width:auto; background:transparent; color:var(--accent); box-shadow:inset 0 0 0 1px var(--line); }
-/* номер в очереди — второй строкой под «Сохранить» (в половину строки «Сохранить · 1 из 2» не помещается);
-   отступы меньше — высота кнопки та же: 13+20+13 = 6+20+14+6 */
-.btn.with-pos { padding-top:6px; padding-bottom:6px; }
-.btn .op-pos { display:block; font-size:12px; line-height:14px; opacity:.85; }
 /* «Удалить» при изменении: красная рамкой; после первого нажатия — залитая (нажать ещё раз — удалить) */
 .btn.del-btn { width:auto; background:transparent; color:var(--danger); box-shadow:inset 0 0 0 1px var(--line); }
 .btn.del-btn.armed { background:var(--danger); color:#fff; box-shadow:none; }
