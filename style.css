@@ -82,9 +82,8 @@ button:disabled .hz, html[data-haptics="off"] .hz { display:none; }
   display:flex; align-items:center; justify-content:center; color:var(--text); transition:transform .2s ease; }
 .theme-switch .knob svg { width:16px; height:16px; }
 .theme-switch[aria-checked="true"] .knob { transform:translateX(26px); }
-/* шапка истории и режима изменения */
+/* шапка режима изменения: «Изменение» и дата операции (у Истории и Настроек шапки нет) */
 .editbar { display:flex; align-items:center; gap:6px; margin-bottom:14px; min-height:42px; }
-.editbar .back { border:0; background:transparent; color:var(--accent); font-size:22px; padding:4px 10px 4px 2px; }
 .editbar .title { font-size:16px; font-weight:600; }
 /* шапка изменения: «Изменение» и справа дата-время операции — кнопкой-«таблеткой» (видно, что её можно нажать) */
 /* заголовок не обрезаем; если вместе с датой не помещается (узкий экран, длинное слово) — дата уходит на строку ниже, вправо */

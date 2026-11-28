@@ -26,8 +26,6 @@ var I18N = {
   "retry": { ru: "Повторить", en: "Retry", de: "Wiederholen", sr: "Ponovi", es: "Reintentar" },
   "save": { ru: "Сохранить", en: "Save", de: "Speichern", sr: "Sačuvaj", es: "Guardar" },
   "delete": { ru: "Удалить", en: "Delete", de: "Löschen", sr: "Obriši", es: "Eliminar" },
-  "back": { ru: "Назад", en: "Back", de: "Zurück", sr: "Nazad", es: "Atrás" },
-  "back.toForm": { ru: "Назад к вводу", en: "Back to entry", de: "Zurück zur Eingabe", sr: "Nazad na unos", es: "Volver a la entrada" },
 
   "net.title": { ru: "Нет связи", en: "No connection", de: "Keine Verbindung", sr: "Nema veze", es: "Sin conexión" },
   "net.savedOnPhone": { ru: "Операции сохранятся на телефоне", en: "Transactions will be kept on the phone", de: "Buchungen bleiben auf dem Telefon", sr: "Transakcije ostaju na telefonu", es: "Los movimientos se guardan en el teléfono" },
@@ -38,7 +36,6 @@ var I18N = {
     sr: { one: "{n} transakcija čeka slanje", few: "{n} transakcije čekaju slanje", other: "{n} transakcija čeka slanje" },
     es: { one: "{n} movimiento pendiente de envío", other: "{n} movimientos pendientes de envío" } },
 
-  "hist.title": { ru: "История", en: "History", de: "Verlauf", sr: "Istorija", es: "Historial" },
   "settings.title": { ru: "Настройки", en: "Settings", de: "Einstellungen", sr: "Podešavanja", es: "Ajustes" },
   "edit.title": { ru: "Изменение", en: "Edit", de: "Bearbeiten", sr: "Izmena", es: "Editar" },
   "edit.deleteAgain": { ru: "Нажмите «Удалить» ещё раз", en: "Tap “Delete” again", de: "Noch einmal auf „Löschen“ tippen", sr: "Dodirnite „Obriši“ ponovo", es: "Toca «Eliminar» otra vez" },

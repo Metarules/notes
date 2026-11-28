@@ -279,8 +279,7 @@ function startEdit(i) {
   state.prefill = null;
   fillForm({ amount: r.amount, currencyId: r.currencyId, categoryId: r.categoryId });
   renderEditWhen();
-  el("histBar").classList.add("hidden");
-  el("navRow").classList.add("hidden"); // при изменении — только «Сохранить» (и «Удалить»); назад — стрелкой в шапке или системной «назад»
+  el("navRow").classList.add("hidden"); // при изменении — только «Сохранить» (и «Удалить»); отмена — системной «назад»
   el("editBar").classList.remove("hidden");
   renderOpUi(); // при изменении операции ни магазина, ни «Пропустить», ни номера в очереди
   el("view-history").classList.add("hidden");
