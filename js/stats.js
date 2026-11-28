@@ -80,16 +80,21 @@ function statsSave(list) {
   keys.slice(STATS_KEEP).forEach(function (k) { delete o[k]; });
   try { store("stats", JSON.stringify(o)); } catch (e) {}
 }
-// строка под периодом: "sync" — идёт обновление, "stale" / "staleOffline" — показаны сохранённые, обновить не вышло; "" — пусто.
-// Место под строку есть всегда — цифры ниже не прыгают, когда она появляется и исчезает.
+// состояние данных — значок справа от периода (в режиме «Даты» — справа от полей):
+// "sync" — идёт обновление (крутилка), "stale" — показаны сохранённые, обновить не вышло (значок «обновить», нажатие —
+// повторить), "staleOffline" — то же без связи (жёлтое облачко, как «Нет связи» на форме; нажатие — пояснение), "" — ничего.
+// Значок своего места не занимает — дата и цифры ниже не сдвигаются, когда он появляется и исчезает.
+var ICON_REFRESH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8.1 8.1 0 0 0-15.5-2M4 4v5h5"/><path d="M4 13a8.1 8.1 0 0 0 15.5 2M20 20v-5h-5"/></svg>';
+var ICON_OFFLINE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M18 18H7a4.5 4.5 0 0 1-.9-8.9 6 6 0 0 1 1.4-2.8"/><path d="M10.6 5.2A6 6 0 0 1 17.9 10a4 4 0 0 1 2.6 6.7"/></svg>';
 function setStatsSync(mode) {
-  var b = el("statsSync");
-  b.className = "stats-sync" + (mode === "sync" ? " on" : "");
-  if (mode === "sync") b.innerHTML = '<span class="q-spin"></span>' + esc(t("stats.syncing"));
-  else if (mode === "stale") b.innerHTML = esc(t("stats.stale")) + ' <button class="link inline" data-act="loadStats">' + esc(t("retry")) + '</button>';
-  else if (mode === "staleOffline") { b.textContent = t("stats.staleOffline"); b.className += " net-text"; }
-  else b.textContent = "";
+  var dates = stats.kind === "c", b = el(dates ? "statsSyncDates" : "statsSync");
+  el(dates ? "statsSync" : "statsSyncDates").innerHTML = "";
+  if (mode === "sync") b.innerHTML = '<span class="sync-ico" aria-label="' + esc(t("stats.syncing")) + '"><span class="q-spin"></span></span>';
+  else if (mode === "stale") b.innerHTML = '<button class="sync-ico" data-act="loadStats" aria-label="' + esc(t("stats.stale") + ". " + t("retry")) + '">' + ICON_REFRESH + '</button>';
+  else if (mode === "staleOffline") b.innerHTML = '<button class="sync-ico net-text" data-act="statsOfflineInfo" aria-label="' + esc(t("stats.staleOffline")) + '">' + ICON_OFFLINE + '</button>';
+  else b.innerHTML = "";
 }
+function statsOfflineInfo() { toast(t("stats.staleOffline"), "net", TOAST_LONG_MS); }
 function statsKey(r) { return dkey(r.from) + "|" + dkey(r.to); }
 function statsVisible() { return !el("view-history").classList.contains("hidden") && stats.pane === "stats"; }
 

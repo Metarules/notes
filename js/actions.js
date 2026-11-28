@@ -25,7 +25,8 @@ var ACTIONS = {
   retryOlder: function () { retryOlder(); },
   setStatsKind: function (a) { setStatsKind(a); },
   shiftStats: function (a) { shiftStats(Number(a)); },
-  loadStats: function () { loadStats(true); }, // «Повторить» и смена своих дат — запрос заново
+  loadStats: function () { loadStats(true); }, // значок «обновить» и смена своих дат — запрос заново
+  statsOfflineInfo: function () { statsOfflineInfo(); },
   setLang: function () { setLang(); }
 };
 
