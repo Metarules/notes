@@ -197,8 +197,8 @@ function loadOneStats(key, r, cached, seq) {
 // покупка в прошлом не давала «↑ 200%». Текущий, ещё не закончившийся промежуток сравниваем с теми же днями прошлых
 // (20–28 нояб. — со средним по 20–28 окт., сент., авг.): иначе неполный период всегда выглядел бы экономнее полного.
 // Промежутки, начавшиеся раньше первой операции в таблице, в среднее не берём — неполные данные его занизили бы.
-// Отклонения меньше CMP_MIN_PCT не показываем. Сравнение включается в «Настройках», по умолчанию выключено (и не запрашивается).
-var CMP_PERIODS = 3, CMP_MIN_PCT = 10;
+// Показываем любое отклонение (ровно 0% — нет). Сравнение включается в «Настройках», по умолчанию выключено (и не запрашивается).
+var CMP_PERIODS = 3;
 function cmpOn() { return store("cmp") === "on"; }
 function compareRanges(kind, r) {
   var today = todayD(), partial = r.from <= today && today < r.to, first = fromKey(statsFirstDay()), list = [];
@@ -241,7 +241,7 @@ function compareAvg() {
 function deltaHtml(cur, avg, goodUp) {
   if (!(avg > 0)) return "";
   var d = Math.round((cur - avg) / avg * 100);
-  if (Math.abs(d) < CMP_MIN_PCT) return "";
+  if (d === 0) return "";
   var up = d > 0;
   return ' <span class="dpct ' + (up === goodUp ? "good" : "bad") + '">' + (up ? "↑" : "↓") + "\u2009" + (Math.abs(d) > 999 ? "&gt;999" : Math.abs(d)) + "%</span>";
 }
