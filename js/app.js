@@ -159,6 +159,7 @@ applyTheme();
 applyPattern();
 applyHaptics();
 applySounds();
+applyCmp();
 applyStaticI18n();
 renderLangSelect();
 setSaving(false);

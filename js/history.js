@@ -19,45 +19,50 @@ document.addEventListener("pointerdown", function (e) {
   swipe.swallow = false;
   if (swipe.openRow && !swipe.openRow.contains(e.target)) { closeOpenRow(); swipe.swallow = true; }
 }, true);
-var list = el("historyList");
-list.addEventListener("pointerdown", function (e) {
-  var row = e.target.closest(".row");
-  swipe.moved = false;
-  if (!row || e.target.closest(".swipe-del")) return;
-  swipe.row = row; swipe.startX = e.clientX; swipe.startY = e.clientY;
-  swipe.base = row === swipe.openRow ? -REVEAL : 0; swipe.x = swipe.base; swipe.active = false;
-});
-list.addEventListener("pointermove", function (e) {
-  if (!swipe.row) return;
-  var dx = e.clientX - swipe.startX, dy = e.clientY - swipe.startY;
-  if (!swipe.active) {
-    if (Math.abs(dx) < SWIPE_START_PX && Math.abs(dy) < SWIPE_START_PX) return;
-    // вертикально — это прокрутка, а не касание: отпускание пальца не должно открыть операцию на правку
-    if (Math.abs(dy) >= Math.abs(dx)) { swipe.row = null; swipe.moved = true; return; }
-    swipe.active = true; swipe.moved = true;
-    if (swipe.openRow && swipe.openRow !== swipe.row) closeOpenRow();
-    try { swipe.row.setPointerCapture(e.pointerId); } catch (x) {}
+// Свайп и касание — одинаково в «Операциях» и в списке операций категории (catops.js): onTap(row, e) — касание строки
+// (не свайп и не закрытие открытой строки), ему же достаётся нажатие на открытую кнопку «Удалить»
+function bindSwipe(list, onTap) {
+  list.addEventListener("pointerdown", function (e) {
+    var row = e.target.closest(".row");
+    swipe.moved = false;
+    if (!row || e.target.closest(".swipe-del")) return;
+    swipe.row = row; swipe.startX = e.clientX; swipe.startY = e.clientY;
+    swipe.base = row === swipe.openRow ? -REVEAL : 0; swipe.x = swipe.base; swipe.active = false;
+  });
+  list.addEventListener("pointermove", function (e) {
+    if (!swipe.row) return;
+    var dx = e.clientX - swipe.startX, dy = e.clientY - swipe.startY;
+    if (!swipe.active) {
+      if (Math.abs(dx) < SWIPE_START_PX && Math.abs(dy) < SWIPE_START_PX) return;
+      // вертикально — это прокрутка, а не касание: отпускание пальца не должно открыть операцию на правку
+      if (Math.abs(dy) >= Math.abs(dx)) { swipe.row = null; swipe.moved = true; return; }
+      swipe.active = true; swipe.moved = true;
+      if (swipe.openRow && swipe.openRow !== swipe.row) closeOpenRow();
+      try { swipe.row.setPointerCapture(e.pointerId); } catch (x) {}
+    }
+    var x = Math.min(0, swipe.base + dx);
+    if (x < -REVEAL) x = -REVEAL + (x + REVEAL) / 3; // дальше кнопки — с сопротивлением
+    swipe.x = x;
+    setX(swipe.row, x, false);
+  });
+  function endSwipe() {
+    var row = swipe.row;
+    swipe.row = null;
+    if (!row || !swipe.active) return;
+    var open = swipe.x < -REVEAL / 2;
+    if (open && swipe.openRow !== row) { haptic(1); Snd.swipe(); } // кнопка «Удалить» открылась (вибрация — только Android: в iOS тик бывает лишь от касания переключателя)
+    setX(row, open ? -REVEAL : 0, true);
+    swipe.openRow = open ? row : null;
   }
-  var x = Math.min(0, swipe.base + dx);
-  if (x < -REVEAL) x = -REVEAL + (x + REVEAL) / 3; // дальше кнопки — с сопротивлением
-  swipe.x = x;
-  setX(swipe.row, x, false);
-});
-function endSwipe() {
-  var row = swipe.row;
-  swipe.row = null;
-  if (!row || !swipe.active) return;
-  var open = swipe.x < -REVEAL / 2;
-  if (open && swipe.openRow !== row) { haptic(1); Snd.swipe(); } // кнопка «Удалить» открылась (вибрация — только Android: в iOS тик бывает лишь от касания переключателя)
-  setX(row, open ? -REVEAL : 0, true);
-  swipe.openRow = open ? row : null;
+  list.addEventListener("pointerup", endSwipe);
+  list.addEventListener("pointercancel", endSwipe);
+  list.addEventListener("click", function (e) {
+    if (swipe.moved || swipe.swallow) { swipe.moved = false; swipe.swallow = false; return; }
+    var row = e.target.closest(".row");
+    if (row) onTap(row, e);
+  });
 }
-list.addEventListener("pointerup", endSwipe);
-list.addEventListener("pointercancel", endSwipe);
-list.addEventListener("click", function (e) {
-  if (swipe.moved || swipe.swallow) { swipe.moved = false; swipe.swallow = false; return; }
-  var row = e.target.closest(".row");
-  if (!row) return;
+bindSwipe(el("historyList"), function (row, e) {
   var qid = row.getAttribute("data-q");
   if (qid) { // трата из очереди: свайп «Удалить» убирает её с телефона, касание ничего не делает
     if (e.target.closest(".swipe-del")) { haptic(1); Snd.tap(); dropQueued(qid); }
@@ -165,7 +170,8 @@ function checkMore() {
 el("scroller").addEventListener("scroll", checkMore, { passive: true }); // прокручивается область, не страница
 window.addEventListener("online", function () { setTimeout(checkMore, HIST_ONLINE_DELAY_MS); });
 function canRedrawHistory() { return !state.editing && !swipe.openRow && !swipe.row; }
-function deleteRow(i) {
+// onFail — удаление не прошло (операция вернулась в историю): список категории возвращает её к себе
+function deleteRow(i, onFail) {
   var r = state.recent[i];
   if (!r) return;
   if (navigator.onLine === false) { closeOpenRow(); toast(t("form.noNetDelete"), "net", TOAST_LONG_MS); return; }
@@ -198,7 +204,27 @@ function deleteRow(i) {
     if (kind !== "network") deleteFailed = true; // после всех ответов перечитаем историю; без связи — всё равно не выйдет
     var back = state.recent.concat([r]).sort(byDateDesc);
     if (canRedrawHistory()) renderHistory(back); else state.recent = back;
+    if (onFail) onFail();
     allDone(null);
+  });
+}
+// Удалить операцию, где бы она ни была показана: есть в загруженной истории — как свайпом там (deleteRow);
+// нет (список категории далёкого промежутка, catops.js) — тем же запросом напрямую. Из списка категории убираем сразу.
+function deleteOp(r) {
+  if (navigator.onLine === false) { closeOpenRow(); toast(t("form.noNetDelete"), "net", TOAST_LONG_MS); return; }
+  catDrop(r);
+  var i = -1;
+  state.recent.forEach(function (x, k) { if (i < 0 && sameOp(r, x)) i = k; });
+  if (i > -1) { deleteRow(i, function () { catRestore(r); }); return; }
+  swipe.openRow = null;
+  swipe.row = null;
+  call("apiDeleteTransaction", [r.row, { date: r.date, amount: r.amount, currencyId: r.currencyId, categoryId: r.categoryId, id: r.id || "" }], function () {
+    toast(t("hist.deleted", { amount: fmtNum(r.amount) + " " + r.currencyId }));
+  }, function (msg, kind) {
+    if (kind === "network") toast(t("form.noNetDelete"), "net", TOAST_LONG_MS);
+    else if (kind === "timeout") toast(t("hist.deleteUnknown"), false, TOAST_LONG_MS);
+    else toast(msg, true);
+    if (kind !== "timeout") catRestore(r); // не дождались ответа — могла и удалиться: не возвращаем
   });
 }
 

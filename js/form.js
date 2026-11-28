@@ -212,6 +212,7 @@ function save() {
     toast(savedText(form), false, TOAST_SHORT_MS);
     call("apiUpdateTransaction", [ed.row, ed.expected, form], function (res, full) {
       pendingEdits--;
+      catEditDone(old);
       if (full && full.recent) freshRecent = full.recent;
       var moved = !!(res && res.moved);
       redrawWhenFree(function () {
@@ -267,22 +268,25 @@ function showRecent(full) {
 }
 
 // ---------- изменение ----------
-function startEdit(i) {
-  var r = state.recent[i];
+function startEdit(i) { startEditOp(state.recent[i], "history"); }
+// r — операция; from — откуда открыли и куда вернуться: "history" (Операции) или "cat" (операции категории, catops.js)
+function startEditOp(r, from) {
   if (!r) return;
   state.savedNew = { amount: el("amount").value, sign: state.sign, categoryId: state.categoryId, currencyId: el("currency").value, prefill: state.prefill, touched: state.touched };
   // id — по нему сервер найдёт операцию, даже если строки сдвинулись; категория — для строк без id
   // when — дата и время в виде "yyyy-MM-ddTHH:mm" (белградское время, как в таблице); when0 — как было
   var when0 = r.dayKey ? r.dayKey + "T" + (r.time || "00:00") : "";
   state.editing = { row: r.row, expected: { date: r.date, amount: r.amount, currencyId: r.currencyId, categoryId: r.categoryId, id: r.id || "" },
-    when0: when0, when: when0, hasTime: !!r.time };
+    when0: when0, when: when0, hasTime: !!r.time, op: r, from: from };
   state.prefill = null;
   fillForm({ amount: r.amount, currencyId: r.currencyId, categoryId: r.categoryId });
   renderEditWhen();
   el("navRow").classList.add("hidden"); // при изменении — только «Сохранить» (и «Удалить»); отмена — системной «назад»
   el("editBar").classList.remove("hidden");
   renderOpUi(); // при изменении операции ни магазина, ни «Пропустить», ни номера в очереди
+  if (from === "cat") catv.listScroll = el("scroller").scrollTop; // вернёмся на то же место списка
   el("view-history").classList.add("hidden");
+  el("view-cat").classList.add("hidden");
   el("view-add").classList.remove("hidden");
   scrollToTop();
   scheduleFit();
@@ -319,12 +323,14 @@ el("editWhenInput").addEventListener("click", function () {
 
 // операция в истории до ответа сервера: новые сумма, валюта, категория и дата, отметка pending (приглушена)
 function sameOp(a, b) { return a.id ? a.id === b.id : a.row === b.row; }
+// Операция сразу с новыми данными (приглушённо, «сохраняется…») — в истории и в списке категории, если она там есть.
+// Возвращает прежний вид операции — для отката, если сервер не сохранит.
 function showEditLocally(ed, form) {
   var key = { id: ed.expected.id, row: ed.row };
   var i = -1;
   state.recent.forEach(function (x, k) { if (i < 0 && sameOp(key, x)) i = k; });
-  if (i < 0) return null;
-  var old = state.recent[i];
+  var old = i > -1 ? state.recent[i] : ed.op; // в истории может не быть: открыли из списка категории далёкого промежутка
+  if (!old) return null;
   var r = Object.assign({}, old, { amount: form.amount, currencyId: form.currencyId, categoryId: form.categoryId,
     categoryName: categoryName(form.categoryId) || old.categoryName, pending: true });
   // сумма в евро: та же валюта — пересчитываем по прежнему курсу, другая — покажет сервер
@@ -336,6 +342,8 @@ function showEditLocally(ed, form) {
     r.time = hm === "00:00" ? "" : hm;
     r.sortKey = new Date(form.when).getTime();
   }
+  catReplace(old, r);
+  if (i < 0) return old;
   var list = state.recent.slice();
   list[i] = r;
   if (canRedrawHistory()) renderHistory(list.sort(byDateDesc)); else state.recent = list.sort(byDateDesc);
@@ -348,6 +356,7 @@ function checkEditLater(old) {
   toast(t("form.editUnknown"), false, TOAST_LONG_MS);
   setTimeout(function () {
     call("apiGetRecent", [], function (list) {
+      catEditDone(old); // скорее всего записалось — снимаем «сохраняется…» и в списке категории
       freshRecent = list;
       redrawWhenFree(function () { renderHistory(withOlder(freshRecent)); });
     }, function () {
@@ -359,6 +368,7 @@ function checkEditLater(old) {
 // сервер не сохранил изменение — возвращаем операцию к прежнему виду
 function undoEditLocally(old) {
   if (!old) return;
+  catReplace(old, old);
   var list = state.recent.map(function (x) { return sameOp(old, x) ? old : x; }).sort(byDateDesc);
   if (canRedrawHistory()) renderHistory(list); else state.recent = list;
 }
@@ -378,11 +388,9 @@ function deleteEdited() {
   }
   disarmDelete();
   if (navigator.onLine === false) { toast(t("form.noNetDelete"), "net", TOAST_LONG_MS); return; } // остаёмся на изменении
-  var i = -1;
-  state.recent.some(function (x, k) { if (e.expected.id ? x.id === e.expected.id : x.row === e.row) { i = k; return true; } return false; });
-  cancelEdit(); // назад в историю, а там операция пропадёт, как при свайпе
-  if (i < 0) { toast(t("err.server"), true); return; }
-  deleteRow(i);
+  var op = e.op;
+  cancelEdit(); // назад туда, откуда открыли (история или список категории), а там операция пропадёт, как при свайпе
+  deleteOp(op);
 }
 function disarmDelete() {
   clearTimeout(deleteEdited.timer);
@@ -391,6 +399,7 @@ function disarmDelete() {
 }
 
 function cancelEdit() {
+  var from = state.editing && state.editing.from;
   state.editing = null;
   el("editBar").classList.add("hidden");
   el("navRow").classList.remove("hidden");
@@ -404,5 +413,6 @@ function cancelEdit() {
   } else resetForm();
   renderOpUi();
   navDropEdit(); // вышли не через «назад» — убираем запись Изменения из истории браузера
+  if (from === "cat") { showTab("cat"); catResume(); el("scroller").scrollTop = catv.listScroll || 0; return; }
   showTab("history");
 }

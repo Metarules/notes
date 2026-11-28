@@ -6,7 +6,7 @@
 // Номер релиза страницы = число коммитов index.html на GitHub, включая тот, где он записан
 // (git rev-list --count HEAD -- index.html): +1 при каждом изменении страницы. Виден внизу формы
 // рядом с номером сервера — так понятно, что телефон открыл свежую страницу, а не старую из кэша.
-var PAGE_VERSION = 100;
+var PAGE_VERSION = 101;
 
 var state = { categories: [], currencies: [], merchants: {}, recent: [], prefill: null, editing: null, savedNew: null, sign: -1, categoryId: "", todayKey: "",
   loaded: false, loadError: "", offline: false, touched: false, opText: "", opFailShown: false, opMode: false };
@@ -118,8 +118,9 @@ function setSaving(on) {
   var b = el("saveBtn");
   saving = !!on;
   b.classList.toggle("saving", saving);
-  var pos = on ? "" : opPosText(); // «Сохранить · 1 из 3», когда разбираем очередь операций (sms.js)
-  b.innerHTML = on ? '<span class="mini-spinner"></span>' : esc(t("save")) + (pos ? ' <span class="op-pos">· ' + esc(pos) + '</span>' : "") + HZ;
+  var pos = on ? "" : opPosText(); // «1 из 3» мелкой второй строкой, когда разбираем очередь операций (sms.js)
+  b.classList.toggle("with-pos", !!pos);
+  b.innerHTML = on ? '<span class="mini-spinner"></span>' : esc(t("save")) + (pos ? '<span class="op-pos">' + esc(pos) + '</span>' : "") + HZ;
   updateSaveBtn();
 }
 // «Сохранить» доступна, только когда есть сумма, выбрана категория и загружены справочники

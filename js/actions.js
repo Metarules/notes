@@ -27,6 +27,7 @@ var ACTIONS = {
   shiftStats: function (a) { shiftStats(Number(a)); },
   loadStats: function () { loadStats(true); }, // значок «обновить» и смена своих дат — запрос заново
   statsOfflineInfo: function () { statsOfflineInfo(); },
+  toggleCmp: function () { toggleCmp(); },
   openCatOps: function (a) { openCatOps(a); },
   loadCatOps: function () { loadCatOps(); },
   setLang: function () { setLang(); }
