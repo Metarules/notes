@@ -141,7 +141,7 @@ function boot() {
   navOwn(); // адрес после разбора ссылки — свой
   // обновили страницу, стоя на Истории или Настройках — остаёмся там (Изменение после обновления не восстановить)
   var v0 = navState();
-  if (v0 === "edit") { nav.skip++; history.back(); v0 = "history"; } // запись Изменения — шаг обратно на Историю
+  if (v0 === "edit" || v0 === "cat") { nav.skip++; history.back(); v0 = "history"; } // Изменение и операции категории не восстановить — шаг обратно на Историю
   if (v0 !== "add") showTab(v0);
   else if (params.tab === "history") navTo("history");
   load();

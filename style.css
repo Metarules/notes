@@ -217,6 +217,21 @@ button:disabled .hz, html[data-haptics="off"] .hz { display:none; }
 .catrow .nm { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .catrow .amt { font-weight:600; white-space:nowrap; }
 .catrow .pct { color:var(--muted); font-weight:400; font-size:13px; margin-left:6px; }
+/* строка категории нажимается — операции категории (catops.js) */
+.catrow.tap { cursor:pointer; -webkit-tap-highlight-color:transparent; border-radius:8px; }
+.catrow.tap:active { background:var(--accent-soft); }
+/* изменение к прошлому промежутку: у названия категории и под итогами; рост трат — красный, рост доходов — зелёный */
+.dpct { flex:0 0 auto; font-size:12px; font-weight:600; white-space:nowrap; margin-left:auto; }
+.dpct.bad { color:var(--danger); }
+.dpct.good { color:var(--ok); }
+.stat-sum .cmp { display:flex; gap:6px; align-items:baseline; margin-top:3px; font-size:12px; min-height:16px; white-space:nowrap; }
+.stat-sum .cmp .dpct { margin-left:0; }
+.stat-sum .cmp .was { color:var(--muted); overflow:hidden; text-overflow:ellipsis; }
+.cmp-note { color:var(--muted); font-size:12px; margin:6px 4px 0; }
+/* операции категории: шапка с названием, промежутком и суммой */
+.cat-head { margin:2px 4px 14px; }
+.cat-head .ttl { font-size:20px; font-weight:700; }
+.cat-head .sub { color:var(--muted); font-size:14px; margin-top:3px; }
 .bar { height:6px; background:var(--line); border-radius:3px; margin-top:7px; overflow:hidden; }
 .bar i { display:block; height:100%; background:var(--accent); border-radius:3px; }
 .bar.inc i { background:var(--ok); }

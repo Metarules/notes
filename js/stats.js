@@ -153,8 +153,11 @@ function loadStats(fresh) {
     el("pPrev").disabled = !!first && dkey(r.from) <= first; // раньше операций нет — дальше назад листать незачем
   }
   var key = statsKey(r);
+  stats.range = r; stats.shown = null;
+  stats.cmp = compareRange(k, r); stats.cmpFailed = false;
   var cached = statsCached(key), seq = ++stats.seq;
   if (cached) renderStats(cached); else el("statsBody").innerHTML = '<div class="pending tall"><span class="spinner sm"></span></div>';
+  loadCompare(seq);
   if (navigator.onLine === false || state.offline) {
     setStatsSync(cached ? "staleOffline" : "");
     if (!cached) el("statsBody").innerHTML = '<div class="pending tall"><span class="net-text">' + esc(t("stats.waitNet")) + '</span></div>';
@@ -188,21 +191,81 @@ function loadOneStats(key, r, cached, seq) {
       '</span><button class="link inline" data-act="loadStats">' + esc(t("retry")) + '</button></div>';
   });
 }
+// ---------- сравнение с прошлым промежутком ----------
+// Прошлый промежуток того же вида: для «С 20-го», месяца и года — предыдущий, для своих дат — столько же дней перед ними.
+// Текущий, ещё не закончившийся промежуток сравниваем с тем же числом дней прошлого (20–28 нояб. — с 20–28 окт.):
+// иначе неполный период всегда выглядел бы экономнее полного.
+function compareRange(kind, r) {
+  var p;
+  if (kind === "c") { var len = dayDiff(r.from, r.to) + 1; p = { from: addDays(r.from, -len), to: addDays(r.from, -1) }; }
+  else p = rangeFor(kind, stats.offset - 1);
+  var today = todayD();
+  p.partial = r.from <= today && today < r.to;
+  if (p.partial) { var cut = addDays(p.from, dayDiff(r.from, today)); if (cut < p.to) p.to = cut; }
+  var first = fromKey(statsFirstDay());
+  return first && p.to < first ? null : p; // раньше операций не было — сравнивать не с чем
+}
+// подпись под итогами: «Для сравнения: октябрь 2026» / «Для сравнения: 20 окт. – 28 окт. 2026»
+function compareLabel(p) {
+  if (!p.partial && stats.kind !== "c") return rangeLabel(stats.kind, p).toLowerCase();
+  return fmtDayMonth(p.from, p.from.getFullYear() !== p.to.getFullYear()) + " – " + fmtDayMonth(p.to, true);
+}
+// цифры прошлого промежутка: сохранённые — сразу; нет — один запрос apiGetStats (прошлое не меняется — храним, как всё)
+function loadCompare(seq) {
+  var p = stats.cmp;
+  if (!p || statsCached(statsKey(p)) || navigator.onLine === false || state.offline) return;
+  // полный прошлый период придёт в общем ответе, который уже идёт, — отдельно не просим
+  if (!p.partial && stats.kind !== "c" && statsAll.loading) return;
+  call("apiGetStats", [dkey(p.from), dkey(p.to)], function (res) {
+    statsSave([[statsKey(p), res]]);
+    if (seq === stats.seq && stats.shown) renderStats(stats.shown);
+  }, function () {
+    if (seq !== stats.seq) return;
+    stats.cmpFailed = true; // без сравнения — место под него больше не держим
+    if (stats.shown) renderStats(stats.shown);
+  });
+}
+// изменение к прошлому: «↑ 18%» / «↓ 7%»; рост трат — красный, рост доходов — зелёный.
+// prev === undefined — цифр прошлого ещё нет (строка-заглушка той же высоты, чтобы ничего не прыгало)
+function deltaPct(cur, prev) { return prev > 0 ? Math.round((cur - prev) / prev * 100) : null; }
+function deltaHtml(cur, prev, goodUp) {
+  var d = deltaPct(cur, prev);
+  if (d === null || d === 0) return "";
+  var up = d > 0, cls = up === goodUp ? "good" : "bad";
+  return '<span class="dpct ' + cls + '">' + (up ? "↑" : "↓") + "\u2009" + (Math.abs(d) > 999 ? "&gt;999" : Math.abs(d)) + "%</span>";
+}
+function cmpLine(cur, prev, goodUp) {
+  if (prev === undefined || (!cur && !prev)) return '<div class="cmp">&nbsp;</div>'; // ждём цифр / было и есть по нулям
+  return '<div class="cmp">' + deltaHtml(cur, prev, goodUp) + '<span class="was">' + esc(t("stats.was", { sum: fmtEur(prev) })) + '</span></div>';
+}
+
 function renderStats(res) {
-  var html = '<div class="card stat-sum"><div><div class="cap">' + esc(t("stats.spent")) + '</div><div class="val">' + esc(fmtEur(res.spent)) + '</div></div>' +
-    '<div><div class="cap">' + esc(t("stats.income")) + '</div><div class="val">' + esc(fmtEur(res.income)) + '</div></div>';
+  stats.shown = res;
+  var p = stats.cmp, prev = p ? statsCached(statsKey(p)) : null;
+  // ждём цифр прошлого — держим под них место; не будет (нет связи, ошибка) — не держим
+  var waiting = !!p && !prev && !stats.cmpFailed && navigator.onLine !== false && !state.offline;
+  var show = !!prev || waiting;
+  function prevOf(key) { return prev ? (prev[key] || 0) : undefined; }
+  var html = '<div class="card stat-sum"><div><div class="cap">' + esc(t("stats.spent")) + '</div><div class="val">' + esc(fmtEur(res.spent)) + '</div>' +
+    (show ? cmpLine(res.spent || 0, prevOf("spent"), false) : "") + '</div>' +
+    '<div><div class="cap">' + esc(t("stats.income")) + '</div><div class="val">' + esc(fmtEur(res.income)) + '</div>' +
+    (show ? cmpLine(res.income || 0, prevOf("income"), true) : "") + '</div>';
   // баланс: зелёный — в плюсе, красный — в минусе
   var bal = Math.round(((res.income || 0) - (res.spent || 0)) * 100) / 100;
   html += '<div class="bal"><span class="cap">' + esc(t("stats.balance")) + '</span><span class="val ' + (bal > 0 ? "plus" : bal < 0 ? "minus" : "") + '">' +
-    (bal > 0 ? "+" : bal < 0 ? "−" : "") + esc(fmtEur(Math.abs(bal))) + '</span></div></div>';
+    (bal > 0 ? "+" : bal < 0 ? "−" : "") + esc(fmtEur(Math.abs(bal))) + '</span></div></div>' +
+    (show ? '<div class="cmp-note">' + esc(t("stats.cmpWith", { range: compareLabel(p) })) + '</div>' : "");
   if (!res.count) { el("statsBody").innerHTML = html + '<p class="muted center">' + esc(t("stats.noOps")) + '</p>'; return; }
   function block(title, key, cls) {
     var list = (res.categories || []).filter(function (c) { return c[key] > 0; }).sort(function (a, b) { return b[key] - a[key]; });
     if (!list.length) return "";
     var total = res[key === "spent" ? "spent" : "income"], max = list[0][key];
+    var before = {}; // категория → сумма в прошлом промежутке
+    if (prev) (prev.categories || []).forEach(function (c) { before[String(c.categoryId)] = c[key] || 0; });
     return '<div class="sect">' + esc(title) + '</div><div class="card">' + list.map(function (c) {
       var pct = total > 0 ? c[key] / total * 100 : 0;
-      return '<div class="catrow"><div class="top"><span class="nm">' + esc(categoryName(c.categoryId) || c.categoryName) + '</span><span class="amt">' + esc(fmtEur(c[key])) +
+      return '<div class="catrow tap" data-act="openCatOps" data-arg="' + esc(key + ":" + c.categoryId) + '"><div class="top"><span class="nm">' + esc(categoryName(c.categoryId) || c.categoryName) + '</span>' +
+        (prev ? deltaHtml(c[key], before[String(c.categoryId)] || 0, key === "income") : "") + '<span class="amt">' + esc(fmtEur(c[key])) +
         '<span class="pct">' + (pct > 0 && pct < 1 ? "&lt;1" : Math.round(pct)) + '%</span></span></div>' +
         '<div class="bar ' + cls + '"><i data-w="' + Math.max(1, Math.round(c[key] / max * 100)) + '"></i></div></div>';
     }).join("") + '</div>';
@@ -214,7 +277,7 @@ function renderStats(res) {
 
 // экраны: add — ввод (основной), history — история, settings — настройки
 // ---------- системная «назад» ----------
-// Экраны История, Настройки и Изменение — записи в истории браузера (адрес тот же, страница не перезагружается):
+// Экраны История, Настройки, Изменение и операции категории — записи в истории браузера (адрес тот же, страница не перезагружается):
 // кнопка «назад» встроенного Safari и свайп от левого края возвращают на предыдущий экран (своих стрелок в шапках нет).
 // Вкладки внутри экрана (Операции/Статистика, вид периода) в историю не пишем — иначе «назад» пришлось бы жать много раз.
 // skip — сколько ближайших «назад» сделала сама страница (ушли с Изменения после сохранения) и показывать ничего не нужно;
@@ -245,19 +308,28 @@ window.addEventListener("popstate", function () {
     history.back();
     return;
   }
+  // операции категории не пережили обновление страницы — шагаем обратно на Историю, как с Изменения
+  if (v === "cat" && !catv.cur) { nav.skip++; history.back(); return; }
+  var fromCat = !el("view-cat").classList.contains("hidden");
   if (state.editing) cancelEdit(); // сам покажет Историю
+  if (v === "cat") { showTab("cat"); loadCatOps(); return; } // «вперёд» — снова тот же список
+  if (v === "history" && fromCat) { showTab("history", true); return; }
   if (v !== "history" || el("view-history").classList.contains("hidden")) showTab(v);
 });
 
-function showTab(name) {
+// back — вернулись системной «назад» с операций категории: статистику не перезапрашиваем и встаём на прежнее место
+function showTab(name, back) {
   if (state.editing && name === "add") return;
-  var h = name === "history", st = name === "settings";
+  var h = name === "history", st = name === "settings", c = name === "cat";
   closeCurPanel();
-  el("view-add").classList.toggle("hidden", h || st);
+  el("view-add").classList.toggle("hidden", h || st || c);
   el("view-history").classList.toggle("hidden", !h);
   el("view-settings").classList.toggle("hidden", !st);
+  el("view-cat").classList.toggle("hidden", !c);
+  if (!c) catv.seq++; // ушли с операций категории — их загрузку не продолжаем (catops.js)
   scrollToTop();
   scheduleFit();
+  if (h && back) { el("scroller").scrollTop = catv.scroll; return; }
   if (h && stats.pane === "stats") loadStats(true); // свежие цифры — могли добавиться операции
   else if (h) setTimeout(checkMore, 0);
 }
