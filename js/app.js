@@ -138,12 +138,22 @@ function boot() {
   var cached = readCache();
   if (cached) applyData(cached);
   else { renderCategories(); renderHistory(null); applyPrefill(); } // формат банка разбирается и без справочников
-  if (params.tab === "history") showTab("history");
+  navOwn(); // адрес после разбора ссылки — свой
+  // обновили страницу, стоя на Истории или Настройках — остаёмся там (Изменение после обновления не восстановить)
+  var v0 = navState();
+  if (v0 === "edit") { nav.skip++; history.back(); v0 = "history"; } // запись Изменения — шаг обратно на Историю
+  if (v0 !== "add") showTab(v0);
+  else if (params.tab === "history") navTo("history");
   load();
 }
 
-// шорткат открыл новую ссылку на уже открытой странице — перечитываем её
-window.addEventListener("hashchange", function () { location.reload(); });
+// шорткат открыл новую ссылку на уже открытой странице — перечитываем её.
+// Шаг «назад/вперёд» по экранам тоже может сменить адрес (данные траты убраны из него позже), но на свой же —
+// это не новая ссылка (адреса, выставленные страницей, — nav.own в stats.js)
+window.addEventListener("hashchange", function () {
+  if (nav.own[location.href]) return;
+  location.reload();
+});
 
 applyTheme();
 applyPattern();

@@ -208,6 +208,47 @@ function renderStats(res) {
 }
 
 // экраны: add — ввод (основной), history — история, settings — настройки
+// ---------- системная «назад» ----------
+// Экраны История, Настройки и Изменение — записи в истории браузера (адрес тот же, страница не перезагружается):
+// кнопка «назад» встроенного Safari, свайп от левого края и стрелки в шапках возвращают на предыдущий экран.
+// Вкладки внутри экрана (Операции/Статистика, вид периода) в историю не пишем — иначе «назад» пришлось бы жать много раз.
+// skip — сколько ближайших «назад» сделала сама страница (ушли с Изменения после сохранения) и показывать ничего не нужно;
+// own — адреса, которые страница выставила сама: шаг по истории на них — не новая ссылка шортката (см. app.js)
+var nav = { skip: 0, own: {} };
+function navOwn() { nav.own[location.href] = true; }
+function navState() { return (history.state && history.state.v) || "add"; }
+function navPush(v) { try { history.pushState({ v: v }, "", location.href); } catch (e) {} navOwn(); }
+// вперёд на экран: ссылка «История», шестерёнка
+function navTo(name) {
+  showTab(name);
+  if (navState() !== name) navPush(name);
+}
+// стрелка в шапке — то же, что системная «назад»
+function navBack() {
+  if (navState() !== "add") { history.back(); return; }
+  if (state.editing) cancelEdit(); else showTab("add"); // записи нет (страницу обновили на экране) — просто назад
+}
+// ушли с Изменения сами (сохранили, удалили): убираем его запись, чтобы «назад» с Истории вёл на форму
+function navDropEdit() {
+  if (navState() !== "edit") return;
+  nav.skip++;
+  history.back();
+}
+window.addEventListener("popstate", function () {
+  if (nav.skip > 0) { nav.skip--; return; }
+  var v = navState();
+  if (v === "edit") {
+    if (state.editing) return;
+    // «вперёд» на Изменение, которое уже закрыто (сохранено): шагаем обратно на Историю —
+    // заменить запись нельзя, иначе подряд окажутся две «Истории» и «назад» сработает не с первого раза
+    nav.skip++;
+    history.back();
+    return;
+  }
+  if (state.editing) cancelEdit(); // сам покажет Историю
+  if (v !== "history" || el("view-history").classList.contains("hidden")) showTab(v);
+});
+
 function showTab(name) {
   if (state.editing && name === "add") return;
   var h = name === "history", st = name === "settings";

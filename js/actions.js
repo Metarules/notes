@@ -8,6 +8,8 @@ var ACTIONS = {
   toggleOps: function () { toggleOps(); },
   netRetry: function () { netRetry(); },
   showTab: function (a) { showTab(a); },
+  navTo: function (a) { navTo(a); },
+  navBack: function () { navBack(); },
   cancelEdit: function () { cancelEdit(); },
   deleteEdited: function () { deleteEdited(); },
   toggleSign: function () { toggleSign(); },

@@ -147,7 +147,8 @@ function resetForm() {
 // убрать данные траты из адресной строки, чтобы обновление страницы не подставило их снова
 // (операцию из очереди убирает nextOp в sms.js)
 function clearUrl() {
-  try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {}
+  try { history.replaceState(history.state, "", location.pathname + location.search); } catch (e) {} // запись экрана (stats.js) сохраняем
+  navOwn();
 }
 
 // крестик в поле суммы: стирает только сумму
@@ -279,13 +280,14 @@ function startEdit(i) {
   fillForm({ amount: r.amount, currencyId: r.currencyId, categoryId: r.categoryId });
   renderEditWhen();
   el("histBar").classList.add("hidden");
-  el("navRow").classList.add("hidden"); // при изменении — только «Сохранить»; назад — стрелкой в шапке
+  el("navRow").classList.add("hidden"); // при изменении — только «Сохранить» (и «Удалить»); назад — стрелкой в шапке или системной «назад»
   el("editBar").classList.remove("hidden");
   renderOpUi(); // при изменении операции ни магазина, ни «Пропустить», ни номера в очереди
   el("view-history").classList.add("hidden");
   el("view-add").classList.remove("hidden");
   scrollToTop();
   scheduleFit();
+  navPush("edit"); // системная «назад» — отмена изменения (stats.js)
 }
 // Дата и время операции в шапке изменения. Подпись — «25 нояб., 12:00» по правилам языка (год — если не текущий);
 // у строк, введённых в таблицу только с датой, время не показываем, пока его не выбрали.
@@ -402,5 +404,6 @@ function cancelEdit() {
     state.savedNew = null;
   } else resetForm();
   renderOpUi();
+  navDropEdit(); // вышли не через «назад» — убираем запись Изменения из истории браузера
   showTab("history");
 }

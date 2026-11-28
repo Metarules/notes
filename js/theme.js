@@ -31,6 +31,7 @@ if (darkQuery) {
 // Меряет форму ввода, поэтому сначала возвращаемся на неё и показываем данные поверх.
 function openDiag() {
   showTab("add");
+  if (navState() !== "add") history.back(); // с Настроек — их запись в истории тоже убираем
   requestAnimationFrame(function () { requestAnimationFrame(showDiag); });
 }
 var DIAG_HOLD_MS = 700;
